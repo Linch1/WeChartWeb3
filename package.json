@@ -1,0 +1,30 @@
+{
+  "name": "pancakeswap-token-charting",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "server": "node ./server/app.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "update-pairs": "node ./workers/worker-update-pairs.js",
+    "listen-pairs": "node ./workers/worker-listen-pairs.js",
+    "price-scraper": "node ./workers/worker-price-scraper.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "abi-decoder": "^2.4.0",
+    "compression": "^1.7.4",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^10.0.0",
+    "express": "^4.17.2",
+    "fs": "*",
+    "helmet": "^4.6.0",
+    "mongoose": "^6.1.3",
+    "morgan": "^1.10.0",
+    "passport": "^0.5.2",
+    "path": "^0.12.7",
+    "web3": "^1.6.0"
+  }
+}
