@@ -6,9 +6,9 @@
   "scripts": {
     "server": "node ./server/app.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "update-pairs": "node ./workers/worker-update-pairs.js",
-    "listen-pairs": "node ./workers/worker-listen-pairs.js",
-    "price-scraper": "node ./workers/worker-price-scraper.js"
+    "update-pairs": "node ./workers/pairs-update.js",
+    "listen-pairs": "node ./workers/pairs-listen.js",
+    "price-scraper": "node ./workers/scraper-price-reserves.js"
   },
   "author": "",
   "license": "ISC",
