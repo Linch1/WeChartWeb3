@@ -5,13 +5,13 @@ const EnumAbi = require('../enum/abi');
 const EnumContracts = require('../enum/contracts');
 const EnumMainTokens = require('../enum/mainTokens');
 
-const fs = require('fs');
-
 // initialize mongodb
 const TokenBasic = require('../server/models/token_basic');
 const TokenHistory = require('../server/models/token_history');
 const TIME_INTERVALL_UIX_TIMESTAMP = 60;
 let TOTAL_TX = 0;
+let INITAL_MEMORY_USAGE = 0;
+
 let BulkWriteOperations = {
     tokenHistory: {
     /*  
@@ -104,17 +104,9 @@ async function updatePrice( foundToken, priceObj, newPrice ) {
     if( ( now - latestHistoryTime ) < TIME_INTERVALL_UIX_TIMESTAMP ){ // update latest record
         
         if( newPrice > latestHistory.high ){
-            //console.log("UPDATED: ", foundToken._id );
-            // await TokenHistory.findByIdAndUpdate( foundToken._id, 
-            //     { $set: { [`price.history.${recordIndexToUpdate}.high`]: newPrice, [`price.history.${recordIndexToUpdate}.high`]: newPrice } }
-            // ); 
             BulkWriteOperations.tokenHistory[foundToken.contract].update.updateOne.update.$set[`price.history.${recordIndexToUpdate}.high`] = newPrice;
         }
         if( newPrice < latestHistory.low ){
-            //console.log("UPDATED: ", foundToken._id );
-            // await TokenHistory.findByIdAndUpdate( foundToken._id, 
-            //     { $set: { [`price.history.${recordIndexToUpdate}.low`]: newPrice } }
-            // ); 
             BulkWriteOperations.tokenHistory[foundToken.contract].update.updateOne.update.$set[`price.history.${recordIndexToUpdate}.low`] = newPrice;
         }
         // update the value anyway also if it is not higher that the high or lower than the low 
@@ -131,10 +123,8 @@ async function updatePrice( foundToken, priceObj, newPrice ) {
             low: newPrice,
             value: newPrice
         };
-        //console.log("UPDATED: ", foundToken._id );
         BulkWriteOperations.tokenHistory[foundToken.contract].update.updateOne.update.$push['price.history'].$each.push(newObj);
         BulkWriteOperations.tokenHistory[foundToken.contract].update.updateOne.update.$inc['price.records'] ++;
-        //await TokenHistory.findByIdAndUpdate( foundToken._id, { $push: {'price.history': newObj }, $inc: { 'price.records': 1 } } ); 
     }
 }
 
@@ -434,8 +424,8 @@ let web3 = new Web3(process.env.PROVIDER);
   * @param {Object} txn (See https://github.com/ethereum/wiki/wiki/JavaScript-API#web3ethgettransaction)
   * @param {Object} block The parent block of the transaction (See https://github.com/ethereum/wiki/wiki/JavaScript-API#web3ethgetblock)
   */
- let SCANNED_TRANSACTIOSN = 0;
- async function scanTransactionCallback(txn, block) {
+let SCANNED_TRANSACTIOSN = 0;
+async function scanTransactionCallback(txn, block) {
     SCANNED_TRANSACTIOSN ++;
     //console.log( txn.to, txn.from )
     if (txn.to === wallet || txn.from === wallet ) {
@@ -623,6 +613,8 @@ let MAIN_TOKEN_PRICE;
         
         await loadCacheTokensBasic();
         await loadCacheTokenHistories();
+
+        INITAL_MEMORY_USAGE = process.memoryUsage().heapUsed;
         
         
         loopUpdateMainTokenPrice();
@@ -651,8 +643,10 @@ let MAIN_TOKEN_PRICE;
 
         let tokenContracts = Object.keys(BulkWriteOperations.tokenHistory); 
         let BulkWriteOperationsClone = JSON.parse(JSON.stringify(BulkWriteOperations));
-        BulkWriteOperations.tokenHistory = {};
         
+        delete BulkWriteOperations.tokenHistory;
+        BulkWriteOperations.tokenHistory = {};
+
         for( let contract of tokenContracts ){
 
             let toInsert = BulkWriteOperationsClone.tokenHistory[contract].insert;
@@ -673,25 +667,10 @@ let MAIN_TOKEN_PRICE;
                 toExecuteSet.push( clonedSet );
             }
         }
-        
-        // console.log('-- QUERIES:');
-        // console.log('INSERT:', JSON.stringify(toExecuteInsert));
-        // console.log('PUSH:', JSON.stringify(toExecutePush));
-        // console.log('SET:', JSON.stringify(toExecuteSet));
        
-        let resInsert = await TokenHistory.insertMany(toExecuteInsert);
-        let resPush = await TokenHistory.bulkWrite(toExecutePush);
-        let resSet = await TokenHistory.bulkWrite(toExecuteSet);
-
-        // console.log( "UPDATED: ", (Date.now() - start)/1000);
-        // console.log( 'TO INSERT LENGTH: ', toExecuteInsert.length );
-        // console.log( 'INSERT RESULT: ', resInsert);
-
-        // console.log( 'PUSH TO EDIT: ', toExecutePush.length);
-        // console.log( 'PUSH RESULT: ', resPush );
-
-        // console.log( 'SET TO EDIT: ', toExecuteSet.length);
-        // console.log( 'SET RESULT: ', resSet );
+        await TokenHistory.insertMany(toExecuteInsert);
+        await TokenHistory.bulkWrite(toExecutePush);
+        await TokenHistory.bulkWrite(toExecuteSet);
 
         await updateTokenHistories( tokenContracts );
         return;
@@ -747,14 +726,19 @@ let MAIN_TOKEN_PRICE;
     /**
      * @description Update/Load the token histories of the passed contracts
      */
-     async function updateTokenHistories(contracts){
+    function relDiff(a, b) {
+        return  100 * Math.abs( ( a - b ) / ( (a+b)/2 ) );
+    }
+    async function updateTokenHistories(contracts){
         let start = Date.now();
+        INITAL_MEMORY_USAGE
         let tokenHistories = await TokenHistory.find({
             contract: { $in: contracts }
         } ,{'price.history': { $slice: -1 } } ).select({ contract: 1, decimals: 1, name: 1 }).lean().exec();
         for( let history of tokenHistories ) CACHE.tokenHistory[history.contract] = history;
         console.log(`[LOAD UPDATE] HISTORIES: UPDATED ${tokenHistories.length}, TIME ${ (Date.now()-start)/1000} - TOTAL ${Object.keys(CACHE.tokenHistory).length}`);
         console.log(`[MEMORY]`, process.memoryUsage())
+        console.log(`[MEMORY] USAGE INCREASE: ${relDiff(INITAL_MEMORY_USAGE, process.memoryUsage().heapUsed) }`)
     }
     
 })();
