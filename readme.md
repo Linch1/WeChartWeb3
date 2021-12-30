@@ -7,7 +7,7 @@
 **Warning** To run this script in a production enviroment you cannot use the free provider that is used inside this repo. You must buy a professional bsc provider, or build your own node. I made an estimation that this script will make at least 350.000.000 requests monthly, so consider this when you search for the provider to buy. I'm personally using Getblock fullnode.
 
 
-**Emprove This** If you know a more efficent way, or any other better than this please let the community know this by opening an issue with infos about your ideas! :heart:
+**Emprove This** If you know a more efficent way, or any other better than this please let the community know this by opening an issue with infos about your ideas! :heart: . This repo can be used not only with pancakeswap but also with any kind of other exchange platform on any chain that is similar to pancakeswap.
 
 ### Setup
 
