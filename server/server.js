@@ -41,7 +41,7 @@ app.use(express.json({limit: '50mb'}));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 app.use(compression({ level: 6, threshold: 0 }));
 app.use(cors({
-  origin: ['https://coinhunters.cc', 'http://localhost:3000']
+  origin: ['https://coinhunters.cc', 'http://localhost:3000', 'http://localhost:3001']
 }));
 
 app.use(helmet());
@@ -53,9 +53,6 @@ app.use(cookieParser());
 app.use( '/token', routesTokens.token );
 app.use( '/token/price', routesTokens.price );
 app.use( '/token/history', routesTokens.history );
-
-
-
 
 app.use('*', (req, res) => { res.status(500).send({status: 'ok'}) });
 
