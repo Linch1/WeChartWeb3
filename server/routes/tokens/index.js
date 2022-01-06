@@ -1,5 +1,6 @@
 module.exports = {
     price: require('./price'),
-    history: require('./history'),
-    token: require('./token')
+    historyPair: require('./history.pair'),
+    historyToken: require('./history.token'),
+    token: require('./token'),
 }

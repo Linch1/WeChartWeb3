@@ -36,20 +36,21 @@ const EnumMainTokens = {
         }
     },
     [EnumChainId.BSC]: {
-        WBNB: {
-            address: "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
-            decimals: 18
-        },
-        BUSD: {
-            address: "0xe9e7cea3dedca5984780bafc599bd69add087d56",
-            decimals: 18
-        },//
         BTC: {
             address: "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
             decimals: 18
         },//
         DOT: {
             address: "0x7083609fce4d1d8dc0c979aab8c869ea2c873402",
+            decimals: 18
+        },//
+
+        WBNB: {
+            address: "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
+            decimals: 18
+        },
+        BUSD: {
+            address: "0xe9e7cea3dedca5984780bafc599bd69add087d56",
             decimals: 18
         },//
         USDC: {
@@ -63,7 +64,15 @@ const EnumMainTokens = {
         DAI: {
             address: "0x1af3f329e8be154074d8769d1ffa4ee058b1dbc3",
             decimals: 18
-        }
+        },
+
+        STABLECOINS: [
+            "0xe9e7cea3dedca5984780bafc599bd69add087d56", // BUSD
+            "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d", // USDC
+            "0x55d398326f99059ff775485246999027b3197955", // USDT
+            "0x1af3f329e8be154074d8769d1ffa4ee058b1dbc3"
+        ],
+        MAIN: "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c"
     }
 }
 module.exports = EnumMainTokens;

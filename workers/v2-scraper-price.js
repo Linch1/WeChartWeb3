@@ -26,7 +26,6 @@ const EnumContracts = require('../enum/contracts');
 const EnumMainTokens = require('../enum/mainTokens');
 
 // initialize mongodb
-const TokenHistory = require('../server/models/token_history');
 let TOTAL_TX = 0;
 
 var configDB = require('../server/config/database');
@@ -35,8 +34,10 @@ const mongoose = require('mongoose');
 let Web3 = require('web3');
 let web3 = new Web3(process.env.PROVIDER); // Initialize Ethereum Web3 client
 
+let MAIN_TOKEN_PRICE = [0];
+
 const Scraper = require('./scraper-price/Scraper');
-const scraper = new Scraper( web3 );
+const scraper = new Scraper( web3, MAIN_TOKEN_PRICE );
 const UPDATE_DATABASE_INTERVAL = 5000; // 5seconds in milliseconds
 const UPDATE_MAIN_TOKEN_INTERVAL = 5000; // 5seconds in milliseconds
 
@@ -45,25 +46,19 @@ let START_TIME = Date.now();
 let FACTORY;
 
 
-
-
-
-
-
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // END HANDLE TOKEN HISTORY CACHE
 async function updateMainTokenPrice(){
-
     let mainTokenPairAddress = await FACTORY.methods.getPair( EnumMainTokens[EnumChainId.BSC].WBNB.address, EnumMainTokens[EnumChainId.BSC].USDT.address ).call();
     let mainTokenPair = await new web3.eth.Contract( EnumAbi[EnumChainId.BSC].PAIR.PANCAKE, mainTokenPairAddress );
     let reserves = await mainTokenPair.methods.getReserves().call();
     let WBNB_RESERVE = reserves[1]/10**EnumMainTokens[EnumChainId.BSC].WBNB.decimals;
     let USDT_RESERVE = reserves[0]/10**EnumMainTokens[EnumChainId.BSC].USDT.decimals;
     let WBNB_PRICE = USDT_RESERVE/WBNB_RESERVE;
-    MAIN_TOKEN_PRICE = WBNB_PRICE;
+    MAIN_TOKEN_PRICE[0] = WBNB_PRICE;
 }
 
 async function loopUpdateMainTokenPrice(){
@@ -330,18 +325,17 @@ async function scanBlockRange(startingBlock, stoppingBlock, callback) {
      * and to take advandage of the bulk operations by aggregating all the stored queries
      * @returns 
      */
+    function getUnixMinute( timeMs ) { return Math.floor( (timeMs/1000) /60) * 60; }
     async function loopUpdateOnDb(){
         while(true){
-            await scraper.bulk.execute();
-            await sleep(UPDATE_DATABASE_INTERVAL);
-        }
-    }
+            let now = getUnixMinute(Date.now());
+            // push the updates every minute change to optimize the writes on the database
+            if( now != getUnixMinute( Date.now() + 1000 ) )  await scraper.bulk.execute();
+            await sleep(1000);
 
-    /**
-     * @description Update/Load the token histories of the passed contracts
-     */
-    function relDiff(a, b) {
-        return  100 * Math.abs( ( a - b ) / ( (a+b)/2 ) );
+            // await sleep(5000);
+            // await scraper.bulk.execute();
+        }
     }
     
 })();

@@ -1,29 +1,26 @@
-const EnumChainId = require("../../enum/chain.id");
-const EnumMainTokens = require("../../enum/mainTokens");
-
-function checkIfArrayIsUnique(myArray) {
-    return myArray.length === new Set(myArray).size;
-}
 class Cache {
     constructor () {
         this.TOKENS_CACHE_MAX_SIZE = 2000;
         this.TOKENS_CACHE_SIZE = 0;
         this.HISTORIES_CACHE_SIZE = 0;
+        this.PRICES_CACHE_SIZE = 0;
 
         this.TOKENS_CACHE_ORDER = [];
         this.HISTORIES_CACHE_ORDER = [];
+        this.PRICES_CACHE_ORDER = [];
 
         this.CACHE = {
             token: {}, // [tokenAddress] => TokenBasic object
-            tokenHistory: {} // [tokenAddress] => { [routerAddress]: { [pairAddress]:  TokenHistory object of this pair }}
+            tokenHistory: {}, // [pairAddress] => TokenHistory object of this pair
+            historyPrice: {} // [pairAddress] => Latest History Price object of this pair
         };
 
     }
-    getTokenHistory( token, router, pair ){
-        let tokenHistory = this.CACHE.tokenHistory[token];
-        let routerHistory = tokenHistory ? tokenHistory[router] : null;
-        let pairHistory = routerHistory ? routerHistory[pair] : null;
-        return pairHistory;
+    getTokenHistory( pair ){
+        return this.CACHE.tokenHistory[pair];
+    }
+    getHistoryPrice( pair ){
+        return this.CACHE.historyPrice[pair];
     }
     getToken( contract ){
         return this.CACHE.token[contract];
@@ -34,6 +31,9 @@ class Cache {
     getSizeHistories(){
         return this.HISTORIES_CACHE_SIZE;
     }
+    getSizePirceHistory(){
+        return this.PRICES_CACHE_SIZE;
+    }
     setToken( tokenAddress, tokenInfos ){
         let cacheSize = this.getSizeTokens();
         if( this.TOKENS_CACHE_ORDER.includes(tokenAddress) ) return;
@@ -41,10 +41,6 @@ class Cache {
         console.log(`[CACHE SIZE TOKEN] ${cacheSize}`);
         if( cacheSize > this.TOKENS_CACHE_MAX_SIZE ){ // keeps the tokens cache with a fixed size
             let toRemove = this.TOKENS_CACHE_ORDER.shift();
-            if( toRemove === EnumMainTokens[EnumChainId.BSC].WBNB.address ) { // PICK ANOTHER ONE TO REMOVE IF IT WAS BNB ADDRESS
-                this.TOKENS_CACHE_ORDER.push(EnumMainTokens[EnumChainId.BSC].WBNB);
-                toRemove = this.TOKENS_CACHE_ORDER.shift();
-            }
             delete this.CACHE.token[toRemove];
             this.TOKENS_CACHE_SIZE --;
         }
@@ -57,25 +53,27 @@ class Cache {
         }
         this.TOKENS_CACHE_SIZE ++;
     }
+
     // HANDLE TOKEN HISTORY CACHE
-    setHistory( token, router, pair, history ){
+    setHistory( pair, history ){
         let cacheSize = this.getSizeHistories();
         if( cacheSize > this.TOKENS_CACHE_MAX_SIZE ){ // keeps the tokens cache with a fixed size
             let toRemove = this.HISTORIES_CACHE_ORDER.shift();
-            if( toRemove === EnumMainTokens[EnumChainId.BSC].WBNB.address ) { // PICK ANOTHER ONE TO REMOVE IF IT WAS BNB ADDRESS
-                this.HISTORIES_CACHE_ORDER.push(EnumMainTokens[EnumChainId.BSC].WBNB);
-                toRemove = this.HISTORIES_CACHE_ORDER.shift();
-            }
-            delete this.CACHE.tokenHistory[toRemove.token][toRemove.router][toRemove.pair];
+            delete this.CACHE.tokenHistory[toRemove];
         }
-        this.HISTORIES_CACHE_ORDER.push( { token: token, router: router, pair: pair } );
-        if(!this.CACHE.tokenHistory[token]) this.CACHE.tokenHistory[token] = {} ;
-        if(!this.CACHE.tokenHistory[token][router]) this.CACHE.tokenHistory[token][router] = {} ;
-        this.CACHE.tokenHistory[token][router][pair] = history;
+        this.HISTORIES_CACHE_ORDER.push( pair );
+        this.CACHE.tokenHistory[pair] = history ;
     }
-    
-    
-    
+
+    setHistoryPrice( pair, history ){
+        let cacheSize = this.getSizePirceHistory();
+        if( cacheSize > this.TOKENS_CACHE_MAX_SIZE ){ // keeps the tokens cache with a fixed size
+            let toRemove = this.PRICES_CACHE_ORDER.shift();
+            delete this.CACHE.historyPrice[toRemove];
+        }
+        this.PRICES_CACHE_ORDER.push( pair );
+        this.CACHE.historyPrice[pair] = history ;
+    }
 }
 
 module.exports = Cache;

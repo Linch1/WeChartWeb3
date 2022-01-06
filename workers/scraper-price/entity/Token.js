@@ -20,7 +20,7 @@ class Token {
         if( searchOnDb && (!tokenInfo || tokenInfo.notFound) ) {
             tokenInfo = await TokenBasic
             .findOne({ contract: token })
-            .select({ contract: 1, decimals: 1, pairs_count: 1, total_supply: 1 })
+            .select({ contract: 1, decimals: 1, pairs_count: 1, total_supply: 1, name: 1 })
             .lean()
             .exec();
             console.log(`[LOADED TOKEN] ${token} `, tokenInfo);

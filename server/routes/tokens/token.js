@@ -17,11 +17,11 @@ function firstSignificant(n) {
 router.get('/info/:contract', 
     async function ( req, res ) {
         let contract = req.params.contract;
-        let router = req.query.router;
-        let pair = req.query.pair;
 
         let tokenInfo = await Services.token.findByContract( contract );
-        let tokenPrice = await Services.history.findPrice( contract, router, pair );
+
+        let pair = await Services.token.getMainPair( contract );
+        let tokenPrice = await Services.price.findPrice( pair );
 
         if( tokenPrice ) {
             tokenInfo.pricescale = 10**(firstSignificant(tokenPrice)) ;
@@ -32,7 +32,6 @@ router.get('/info/:contract',
         return res.status(200).send({ success: { msg: "success", data: tokenInfo }});
     }
 )
-
 router.get('/pairs/:contract', 
     async function ( req, res ) {
         let contract = req.params.contract;
@@ -41,59 +40,10 @@ router.get('/pairs/:contract',
         return res.status(200).send({ success: { msg: "success", data: tokenPairs }});
     }
 )
-
-async function getTokenMainPair( contract ){
-    let tokenPairs = await Services.history.findPairs( contract );
-        
-    if( !tokenPairs ) return null;
-    if( !Object.keys(tokenPairs).length ) return null;
-
-    let mainPair = "";
-    let mainRouter = "";
-    for( let router in tokenPairs ){
-        let routerPairs = tokenPairs[router];
-        for( let pair in routerPairs ){
-            let mainTokenInPair = routerPairs[pair];
-            if ( mainTokenInPair === EnumMainTokens[EnumChainId.BSC].WBNB.address ) { 
-                mainPair = pair; 
-                mainRouter = router; 
-                break; 
-            }
-        }
-    }
-    if(!mainPair){
-        for( let router in tokenPairs ){
-            let routerPairs = tokenPairs[router];
-            for( let pair in routerPairs ){
-                let mainTokenInPair = tokenPairs[pair];
-                if( [
-                    EnumMainTokens[EnumChainId.BSC].BUSD.address,
-                    EnumMainTokens[EnumChainId.BSC].USDC.address,
-                    EnumMainTokens[EnumChainId.BSC].USDT.address,
-                    EnumMainTokens[EnumChainId.BSC].DAI.address
-                ].includes( mainTokenInPair ) )  { 
-                    mainPair = pair; 
-                    mainRouter = router; 
-                    break; 
-                }
-            }
-        }
-    }
-    if(!mainPair){
-        mainRouter = Object.keys(tokenPairs)[0];
-        mainPair = Object.keys(tokenPairs[mainRouter])[0];
-    }
-
-    return { 
-        pair: mainPair, 
-        router: mainRouter,
-        pairToken: tokenPairs[mainRouter][mainPair]
-    }
-}
-router.get('/mainPairs/', 
+router.get('/mainPairMultiple/', 
     async function ( req, res ) {
+        
         let contracts = req.query.contracts;
-
         if( !contracts ) return res.status(400).send({ error: { msg: "Invalid Parameters" }});
         
         try { contracts = JSON.parse(contracts); } 
@@ -101,20 +51,27 @@ router.get('/mainPairs/',
 
         let pairsInfo = {}
         for( let contract of contracts ){
-            pairsInfo[contract] = await getTokenMainPair( contract );
+            pairsInfo[contract] = await Services.token.getMainPair( contract );
         }
         
         return res.status(200).send({ success: { msg: "success", data: pairsInfo }});
     }
 )
+router.get('/mainPairs/:contract', 
+    async function ( req, res ) {
+        let contract = req.params.contract;
+        if( !contract ) return res.status(400).send({ error: { msg: "Invalid Parameters" }});
+        let pairs = await Services.token.getPairs( contract );
+        return res.status(200).send({ success: { msg: "success", data: pairs }});
+    }
+)
 router.get('/mainPair/:contract', 
     async function ( req, res ) {
         let contract = req.params.contract;
-        console.log('INSIDE')
         if( !contract ) return res.status(400).send({ error: { msg: "Invalid Parameters" }});
-        let pairInfo = await getTokenMainPair( contract );
-        if(!pairInfo) res.status(400).send({ error: { msg: "Cannot retrive the token pairs", data: {} }})
-        else return res.status(200).send({ success: { msg: "success", data: pairInfo }});
+        let pair = await Services.token.getMainPair( contract );
+        if(!pair) res.status(400).send({ error: { msg: "Cannot retrive the token pairs", data: {} }})
+        else return res.status(200).send({ success: { msg: "success", data: pair }});
     }
 )
 

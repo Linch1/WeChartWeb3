@@ -1,7 +1,7 @@
 
 const EnumChainId = require("../../enum/chain.id");
 const EnumContracts = require("../../enum/contracts");
-const Bulk = require("./Bulk");
+const Bulk = require("./bulk/Bulk");
 const Cache = require("./Cache");
 const Token = require("./entity/Token");
 const Pair = require('./Pair');
@@ -9,15 +9,19 @@ const Pair = require('./Pair');
 const abiDecoder = require('abi-decoder');
 const EnumAbi = require("../../enum/abi");
 const EnumMainTokens = require("../../enum/mainTokens");
+const EnumBulkTypes = require("../../enum/bulk.records.type");
+const TokenHistory = require("./entity/TokenHistory");
+const HistoryPirce = require("./entity/HistoryPirce");
 abiDecoder.addABI(EnumAbi[EnumChainId.BSC].TOKEN);
 abiDecoder.addABI(EnumAbi[EnumChainId.BSC].ROUTERS.PANCAKE);
 
 
 
 class Scraper {
-    constructor ( web3 ) {
+    constructor ( web3, CHAIN_MAIN_TOKEN_PRICE ) {
         this.web3 = web3;
         this.UPDATE_PRICE_INTERVAL = 60 ; // push the new prices to the db every 60 seconds
+        this.CHAIN_MAIN_TOKEN_PRICE = CHAIN_MAIN_TOKEN_PRICE;
 
         this.METHODS = [ // methods used for swap the tokens
             "swapETHForExactTokens",
@@ -35,9 +39,13 @@ class Scraper {
         for( let router of Object.values(EnumContracts[EnumChainId.BSC].ROUTERS) ) this.ROUTERS.push(router.toLowerCase() );
 
         this.pairs = new Pair( this.web3 );
-        this.bulk = new Bulk();
+        
         this.cache = new Cache();
+        this.bulk = new Bulk( this.cache );
+
         this.tokens = new Token( this.cache, this.web3 );
+        this.tokenHistories = new TokenHistory( this.cache );
+        this.historyPrices = new HistoryPirce( this.cache );
     }
 
     async calculatePriceFromReserves( tx ) {
@@ -68,149 +76,170 @@ class Scraper {
         let [ firstToken0Add, firstToken1Add ] = path[0] < path[1] ? [path[0], path[1]] : [path[1], path[0]]; // get the sold token
         //let [ secondToken0Add, secondToken1Add ] =  path[path.length-2] < path[path.length-1] ? [path[path.length-2], path[path.length-1]] : [path[path.length-1], path[path.length-2]]; // get the bought token
         
-        await this.updatePairPriceWithReserves(tx, tx.to, firstToken0Add.toLowerCase(), firstToken1Add.toLowerCase());    
+        await this.updatePairPriceWithReserves(tx, tx.to, firstToken0Add.toLowerCase(), firstToken1Add.toLowerCase(), [ path[0], path[1] ]);    
     }
 
-    async tokenHierarchy( tokenA, tokenB ){
-        // get the tokens from the db
-        let first_token = await this.tokens.getToken( tokenA );
-        let latest_token = await this.tokens.getToken( tokenB );
-        
-        if( !first_token || !latest_token ){
-            if(!first_token) console.log("[ERR] MISSING: ", tokenA)
-            if(!latest_token) console.log("[ERR] MISSING: ", tokenB)
-            return [null, null];
+    // returns an array [ mainToken, dependantToken ];
+    async tokenHierarchy( first_token, latest_token, history ){ 
+        // to have consistency in data collection keep using the same mainToken and dependantToken if present in history
+        if( history ){ 
+            let mainTokenContract = history.mainToken;
+            if( first_token.contract == mainTokenContract ) return [ first_token, latest_token ]
+            else return [ latest_token, first_token ];
         }
-        // compare wich of the tokens is used more frequently to create pairs. This means that the one with more pairs is the more common used
-        let pairs_comparison = first_token.pairs_count > latest_token.pairs_count; // here pairs_count
-        let main_token = pairs_comparison ? first_token : latest_token;
-        let dependant_token = pairs_comparison ? latest_token : first_token;
-        return [ main_token, dependant_token ];
+       // compare wich of the tokens is used more frequently to create pairs. This means that the one with more pairs is the more common used
+       let pairs_comparison = first_token.pairs_count > latest_token.pairs_count; // here pairs_count
+       let main_token = pairs_comparison ? first_token : latest_token;
+       let dependant_token = pairs_comparison ? latest_token : first_token;
+       return [ main_token, dependant_token ];
     }
+
 
     /**
      * @description Add the token price inside the Bulk history
      * @param {*} token0 address
      * @param {*} token1 address
      */
-    async updatePairPriceWithReserves( tx, router, token0, token1 ){
+    async updatePairPriceWithReserves( tx, router, token0, token1, tokenOriginalOrder ){
 
-    
         let pair_contract = this.pairs.getPair(router, token0, token1);
     
         let first_pair =  await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].PAIR.PANCAKE, pair_contract );
         let first_reserves = await first_pair.methods.getReserves().call();
-        
-        let [ mainToken, dependantToken ] = await this.tokenHierarchy(token0, token1); // get who is the main token in the pair
 
-        if( !mainToken || !mainToken.contract || !dependantToken || !dependantToken.contract ) return;
+        let tokenHistory = await this.tokenHistories.getTokenHistory( pair_contract );
+        if(! this.bulk.bulk_normal.getHistory( pair_contract, EnumBulkTypes.TOKEN_HISTORY ) ) 
+            this.bulk.bulk_normal.intializeBulkForContract( pair_contract, EnumBulkTypes.TOKEN_HISTORY );
         
-        let token0Infos = mainToken.contract == token0 ? mainToken : dependantToken;
-        let token1Infos = mainToken.contract == token1 ? mainToken : dependantToken;
+        let token0Infos = await this.tokens.getToken( token0 );
+        let token1Infos = await this.tokens.getToken( token1 );
+        if( !token0Infos || !token0Infos.contract || !token1Infos || !token1Infos.contract ) return;
+
+        let [ mainToken, dependantToken ] = await this.tokenHierarchy(token0Infos, token1Infos, tokenHistory); // get who is the main token in the pair
     
         let dependantTokenPrice = null; // calculate the dependant token price
         if( mainToken.contract == token0 ) dependantTokenPrice = (first_reserves[0]/10**mainToken.decimals)/(first_reserves[1]/10**dependantToken.decimals); // here decimals
         else dependantTokenPrice = (first_reserves[1]/10**mainToken.decimals)/(first_reserves[0]/10**dependantToken.decimals); 
         
     
-        if( mainToken.contract == EnumMainTokens[EnumChainId.BSC].WBNB.address ) // if the main token was BNB then multiply for get the token usd value
-            dependantTokenPrice = dependantTokenPrice * MAIN_TOKEN_PRICE;
+        if( mainToken.contract == EnumMainTokens[EnumChainId.BSC].WBNB.address ){ // if the main token was BNB then multiply for get the token usd value
+            console.log('[MAIN PRICE]', this.CHAIN_MAIN_TOKEN_PRICE[0])
+            if(this.CHAIN_MAIN_TOKEN_PRICE[0]){
+                dependantTokenPrice = dependantTokenPrice * this.CHAIN_MAIN_TOKEN_PRICE[0];
+            }
+        } 
     
-        let pairHistory = await this.cache.getTokenHistory( dependantToken.contract, router, pair_contract );
-
-        if(! this.bulk.getHistory(dependantToken.contract) ) 
-            this.bulk.intializeBulkForContract(dependantToken.contract)
-    
-        if( !pairHistory ){
-            pairHistory = { history: [], records: 0  }
-            let tokenHistory = {
-                transactions: {
-                    [router]: {
-                        [pair_contract]: {
-                            history: [],
-                            records: 0
-                        }
-                    }
-                },
-                price: {
-                    [router]: {
-                        [pair_contract]: pairHistory
-                    }
-                    
-                },
+        if( !tokenHistory ){
+            tokenHistory = {
+                records_transactions: 0,
+                records_price: 0,
                 chain: EnumChainId.BSC,
-                name: dependantToken.name,
-                contract: dependantToken.contract
+                token0: {
+                    contract: token0Infos.contract,
+                    name: token0Infos.name
+                },
+                token1: {
+                    contract: token1Infos.contract,
+                    name: token1Infos.name
+                },
+                router: router,
+                pair: pair_contract,
+                mainToken: mainToken.contract,
+                dependantToken: dependantToken.contract
             };
             
-            console.log(`[BULK ADD CREATE] ${Object.keys(this.bulk.getHistories()).length} ${dependantToken.contract}`);
-            this.bulk.setNewHistory( dependantToken.contract, tokenHistory );
-            this.cache.setHistory( dependantToken.contract, router, pair_contract, pairHistory );
+            console.log(`[BULK ADD CREATE] ${Object.keys(this.bulk.bulk_normal.getHistories(EnumBulkTypes.TOKEN_HISTORY)).length} ${dependantToken.contract}`);
+            this.bulk.bulk_normal.setNewDocument( pair_contract, EnumBulkTypes.TOKEN_HISTORY, tokenHistory );
+            this.cache.setHistory(pair_contract, tokenHistory);
         }
     
         console.log(`[INFO] MAIN: ${mainToken.contract} | DEPENDANT: ${dependantToken.contract}`); 
         console.log(`[INFO] DEPENDANT PRICE: ${dependantTokenPrice}$`);
         
-        await this.updatePrice( dependantToken.contract, router, pair_contract, pairHistory, dependantTokenPrice, first_reserves[0]/10**token0Infos.decimals, first_reserves[1]/10**token1Infos.decimals );
+        let reserve0 = first_reserves[0]/10**token0Infos.decimals;
+        let reserve1 = first_reserves[1]/10**token1Infos.decimals;
+
+        let pairPrice = await this.historyPrices.getHistory(pair_contract);
+        await this.updatePrice( pair_contract, dependantToken.contract, pairPrice, dependantTokenPrice, reserve0, reserve1 );
 
         // update transactions object
-        this.bulk.setTokenBulkPush( dependantToken.contract, `transactions.${router}.${pair_contract}.history`, { hash: tx.hash, from: tx.from } );
-        this.bulk.setTokenBulkInc( dependantToken.contract, `transactions.${router}.${pair_contract}.records`, 1 );
+        let time = this.getTime();
+        this.bulk.bulk_time.setNewDocument( pair_contract, EnumBulkTypes.HISOTRY_TRANSACTION, time, {
+            time: time, // unix timestamp
+            type: dependantToken.contract == tokenOriginalOrder[0] ? 1 : 0, // buy = 0. sell = 1
+            hash: tx.hash,
+            from: tx.from,
+            pair: pair_contract
+        });
+        this.bulk.bulk_normal.setTokenBulkInc( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,`records_transactions`, 1 );
+        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'reserve0', reserve0);
+        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'reserve1', reserve1);
 
-        // update router pairs
-        this.bulk.setTokenBulkSet( dependantToken.contract, `pairs.${router}.${pair_contract}`, mainToken.contract );
+        let mainReserveValue;
+        if( mainToken.contract == token0 )  mainReserveValue = reserve0;
+        else mainReserveValue = reserve1
+        if( mainToken.contract  == EnumMainTokens[EnumChainId.BSC].MAIN ) mainReserveValue = mainReserveValue * this.CHAIN_MAIN_TOKEN_PRICE[0];
+        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY, 'mainReserveValue', mainReserveValue);
     }
+
+    getTime() { return Math.floor((Date.now()/1000)/this.UPDATE_PRICE_INTERVAL) * this.UPDATE_PRICE_INTERVAL }
     
-    async updatePrice( tokenAddress, router, pair_contract, pairHistory, newPrice, reserve0, reserve1 ) {
+    async updatePrice( pair, tokenAddress, latestHistoryPirce, newPrice, reserve0, reserve1 ) {
     
-        let now = Date.now()/1000;
+        let time = this.getTime();
         let tokenInfo = this.cache.getToken(tokenAddress);
         if( !newPrice ) return;
         
-        let latestHistory = pairHistory.history[ pairHistory.history.length - 1 ];
-        let historiesNotPushed = this.bulk.getTokenBulkPush(tokenAddress,  `price.${router}.${pair_contract}.history` )['$each'];
-        if( historiesNotPushed.length ) latestHistory = historiesNotPushed[historiesNotPushed.length-1];
-
-        let recordIndexToUpdate = (pairHistory.records + historiesNotPushed.length - 1) > 0 ? pairHistory.records + historiesNotPushed.length - 1 : 0;
-        
+        let latestHistory = latestHistoryPirce;
         let latestHistoryTime = latestHistory ? latestHistory.time: 0;
-        let latestHigh = this.bulk.getTokenBulkSet( tokenAddress, `price.${router}.${pair_contract}.history.${recordIndexToUpdate}.high` );
-        let latestLow = this.bulk.getTokenBulkSet( tokenAddress, `price.${router}.${pair_contract}.history.${recordIndexToUpdate}.low` );
-       
-        if(!latestHigh) latestHigh = latestHistory ? latestHistory.high : 0;
-        if(!latestLow) latestLow = latestHistory ? latestHistory.low : 0 ;
 
-        if( ( now - latestHistoryTime ) < this.UPDATE_PRICE_INTERVAL ){ // update latest record
+        let latestHigh = latestHistory ? latestHistory.high : 0;
+        let latestLow = latestHistory ? latestHistory.low : 0 ;
+
+        console.log(`[UPDATING PRICE]`, pair, latestHistory)
+
+        if( ( time - latestHistoryTime ) < this.UPDATE_PRICE_INTERVAL ){ // update latest record
             
             if( newPrice > latestHigh ){
-                this.bulk.setTokenBulkSet( tokenAddress, `price.${router}.${pair_contract}.history.${recordIndexToUpdate}.high`, newPrice );
+                this.bulk.bulk_time.setTokenBulkSet( pair, EnumBulkTypes.HISTORY_PRICE, time, 'high', newPrice );
             }
             if( newPrice < latestLow ){
-                this.bulk.setTokenBulkSet( tokenAddress, `price.${router}.${pair_contract}.history.${recordIndexToUpdate}.low`, newPrice );
+                this.bulk.bulk_time.setTokenBulkSet( pair, EnumBulkTypes.HISTORY_PRICE, time, 'low', newPrice );
             }
             // update the value anyway also if it is not higher that the high or lower than the low 
-            this.bulk.setTokenBulkSet( tokenAddress, `price.${router}.${pair_contract}.history.${recordIndexToUpdate}.value`, newPrice );
-            this.bulk.setTokenBulkSet( tokenAddress, `price.${router}.${pair_contract}.history.${recordIndexToUpdate}.reserve0`, reserve0 );
-            this.bulk.setTokenBulkSet( tokenAddress, `price.${router}.${pair_contract}.history.${recordIndexToUpdate}.reserve1`, reserve1 );
+            this.bulk.bulk_time.setTokenBulkSet( pair, EnumBulkTypes.HISTORY_PRICE, time, 'value', newPrice );
+            this.bulk.bulk_time.setTokenBulkSet( pair, EnumBulkTypes.HISTORY_PRICE, time, 'reserve0', reserve0 );
+            this.bulk.bulk_time.setTokenBulkSet( pair, EnumBulkTypes.HISTORY_PRICE, time, 'reserve1', reserve1 );
+            
         } else { // create new record
 
-            if( latestHistory ) // update close price of latest record
-                this.bulk.setTokenBulkSet( tokenAddress, `price.${router}.${pair_contract}.history.${recordIndexToUpdate}.close`, newPrice );
-            
-            let newObj = {
-                time: Math.floor(now/this.UPDATE_PRICE_INTERVAL) * this.UPDATE_PRICE_INTERVAL, // to have standard intervals, for example the exact minutes on the time. 9:01, 9:02, 9:03
+            if( latestHistory ){ // update close price of latest record
+                if( latestHistoryTime >= time - this.UPDATE_PRICE_INTERVAL ){ // if was the record of the past minute
+                    this.bulk.bulk_time.setTokenBulkSet( pair, EnumBulkTypes.HISTORY_PRICE, latestHistoryTime, 'close', newPrice );
+                }
+            } 
+                
+
+            this.bulk.bulk_time.setNewDocument( pair, EnumBulkTypes.HISTORY_PRICE, time, {
+                time: time, // to have standard intervals, for example the exact minutes on the time. 9:01, 9:02, 9:03
                 open: newPrice,
                 close: newPrice,
                 high: newPrice,
                 low: newPrice,
                 value: newPrice,
                 burned: tokenInfo ? tokenInfo.burned : null,
-                mcap: tokenInfo ? (tokenInfo.total_supply - tokenInfo.burned) * newPrice : null,
-                reserve0: reserve0,
-                reserve1: reserve1
-            };
-            this.bulk.setTokenBulkPush(tokenAddress, `price.${router}.${pair_contract}.history`, newObj);
-            this.bulk.setTokenBulkInc(tokenAddress, `price.${router}.${pair_contract}.records`, 1);
+                mcap: tokenInfo ? (tokenInfo.total_supply - tokenInfo.burned) * newPrice : 0,
+      
+                pair: pair
+            } );
+
+            if( tokenInfo ) {
+                this.bulk.bulk_normal.setTokenBulkSet(pair, EnumBulkTypes.TOKEN_HISTORY, 'burned', tokenInfo.burned )
+                this.bulk.bulk_normal.setTokenBulkSet(pair, EnumBulkTypes.TOKEN_HISTORY, 'mcap', (tokenInfo.total_supply - tokenInfo.burned) * newPrice )
+            }
+                
+            this.bulk.bulk_normal.setTokenBulkSet(pair, EnumBulkTypes.TOKEN_HISTORY, 'value', newPrice );
+            this.bulk.bulk_normal.setTokenBulkInc(pair, EnumBulkTypes.TOKEN_HISTORY, 'records_price', 1);
         }
     }
     

@@ -52,7 +52,8 @@ app.use(cookieParser());
 // TOKENS ROUTES
 app.use( '/token', routesTokens.token );
 app.use( '/token/price', routesTokens.price );
-app.use( '/token/history', routesTokens.history );
+app.use( '/token/history', routesTokens.historyToken );
+app.use( '/pair/history', routesTokens.historyPair );
 
 app.use('*', (req, res) => { res.status(500).send({status: 'ok'}) });
 

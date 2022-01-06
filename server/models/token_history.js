@@ -2,72 +2,41 @@ var mongoose = require('mongoose');
 
 var tokenHistorySchema = mongoose.Schema({
 
-    transactions: {
-        _id: false,
-        type: Map, // router address
-        of: {
-            _id: false,
-            type: Map, // pair address
-            of: {
-                history: [{
-                    _id: false,
-                    time: Number,
-                    hash: String,
-                    from: String,
-                    sold: Number,
-                    bought: Number,
-                    value: Number // estimated buy or sell price
-                }],
-                records: {
-                    type: Number,
-                    default: 0
-                }
-            }
-        }
+    records_transactions: Number,
+    records_price: Number,
+
+    chain: Number,
+    
+    router: String,
+    pair: String,
+
+    token0: {
+        contract: String,
+        name: String
+    },
+    token1: {
+        contract: String,
+        name: String
     },
 
-    price: {
-        type: Map, // router address
-        of: {
-            _id: false,
-            type: Map, // pair address
-            of: {
-                _id: false,
-                history: [{
-                    _id: false,
-                    time: Number, // unix timestamp
-                    open: Number,
-                    close: Number,
-                    high: Number,
-                    low: Number,
-                    value: Number,
-                    dependantValue: Number, // the value based on the token with which it is in pair
-                    burned: Number,
-                    mcap: Number,
-                    reserve0: Number,
-                    reserve1: Number
-                }],
-                records: {
-                    type: Number,
-                    default: 0
-                }
-            }
-        }
-    },
+    mainToken: String,
+    dependantToken: String,
 
-    pairs: {
-        type: Map, // router address
-        of: {
-            _id: false,
-            type: Map, // pair address
-            of: String // paired token
-        } // list of router's pairs
-    },
+    burned: Number,
+    mcap: Number,
+    value: Number,
+    reserve0: Number,
+    reserve1: Number,
+    mainReserveValue: Number,
 
-    chain: String,
-    contract: String,
-    name: String
+    variation: {
+        daily: Number
+    }
     
 }, { timestamps: { createdAt: 'created_at' } });
-tokenHistorySchema.index({ contract: 1 }, {unique: true});
+tokenHistorySchema.index({ 
+    'token0.contract': 1, 'token1.contract': 1, 
+    'variation.daily': 1, pair: 1, router: 1,
+    chain: 1
+}, {unique: true});
 module.exports = mongoose.model('TokenHistory', tokenHistorySchema);
