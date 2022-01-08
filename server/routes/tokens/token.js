@@ -17,18 +17,19 @@ function firstSignificant(n) {
 router.get('/info/:contract', 
     async function ( req, res ) {
         let contract = req.params.contract;
+        let tokenInfo = {};
 
-        let tokenInfo = await Services.token.findByContract( contract );
+        let tokenRetrived = await Services.token.findByContract( contract );
+        if( tokenRetrived ) tokenInfo = tokenRetrived;
 
         let pair = await Services.token.getMainPair( contract );
         let tokenPrice = await Services.price.findPrice( pair );
 
         if( tokenPrice ) {
-            tokenInfo.pricescale = 10**(firstSignificant(tokenPrice)) ;
+            tokenInfo.pricescale = 10**(firstSignificant(tokenPrice) + 1) ;
             tokenInfo.minmov = 1;
         }
         
-        if( !tokenInfo ) return res.status(400).send({ error: { msg: "Cannot retrive the token infos", data: {} }});
         return res.status(200).send({ success: { msg: "success", data: tokenInfo }});
     }
 )
