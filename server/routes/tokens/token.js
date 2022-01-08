@@ -20,6 +20,7 @@ router.get('/info/:contract',
         let tokenInfo = {};
 
         let tokenRetrived = await Services.token.findByContract( contract );
+        console.log('RETRIVED TOKEN: ', tokenRetrived );
         if( tokenRetrived ) tokenInfo = tokenRetrived;
 
         let pair = await Services.token.getMainPair( contract );

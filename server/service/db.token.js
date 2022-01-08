@@ -5,18 +5,18 @@ var TokenBasic = require('../models/token_basic');
 var ServiceHistory = require('./db.history');
 
 async function findByContract( contract ){
-    let tokenInfos = await TokenBasic.findOne({ contract: contract }).lean().exec();
+    let tokenInfos = await TokenBasic.findOne({ contract: contract.toLowerCase() }).lean().exec();
     if( !tokenInfos || tokenInfos.name == "$NULL" ) { return null }
     return tokenInfos;
 }
 async function getSymbolFromContract( contract ){
-    let tokenInfos = await TokenBasic.findOne({ contract: contract }).select({ symbol: 1 }).lean().exec();
+    let tokenInfos = await TokenBasic.findOne({ contract: contract.toLowerCase() }).select({ symbol: 1 }).lean().exec();
     if( !tokenInfos || tokenInfos.name == "$NULL" ) { return null }
     return tokenInfos.symbol;
 }
 
 async function getPairs( contract ){
-    let tokenPairs = await ServiceHistory.findPairs( contract );
+    let tokenPairs = await ServiceHistory.findPairs( contract.toLowerCase() );
     let pairs = {} // tokenAddress => { reserve: num, name: name }
     for( let i in tokenPairs ){
         let pairInfos = tokenPairs[i];
@@ -43,7 +43,7 @@ async function getPairs( contract ){
 }
 async function getMainPair( contract ){
 
-    let pairs = await getPairs( contract ) // tokenAddress => pair informations
+    let pairs = await getPairs( contract.toLowerCase() ) // tokenAddress => pair informations
 
     let mainPair = null; // each token probably has a pair with bnb or main stable coins, and we prefer that ones
     let mainPairVal = 0;
