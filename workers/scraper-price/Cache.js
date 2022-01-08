@@ -1,6 +1,6 @@
 class Cache {
     constructor () {
-        this.TOKENS_CACHE_MAX_SIZE = 2000;
+        this.TOKENS_CACHE_MAX_SIZE = 5000;
         this.TOKENS_CACHE_SIZE = 0;
         this.HISTORIES_CACHE_SIZE = 0;
         this.PRICES_CACHE_SIZE = 0;
