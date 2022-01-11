@@ -7,6 +7,14 @@ async function findPairs( contract ){
     if(!documents.length) return null;
     return documents;
 }
+async function findPairsMultiple( contracts ){
+    let documents = await TokenHistory.find(
+        { dependantToken: { $in: contracts } }
+    ).lean().exec();
+    if(!documents.length) return null;
+    return documents;
+}
 module.exports = {
-    findPairs
+    findPairs,
+    findPairsMultiple
 }

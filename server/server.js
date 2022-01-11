@@ -41,7 +41,9 @@ app.use(express.json({limit: '50mb'}));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 app.use(compression({ level: 6, threshold: 0 }));
 app.use(cors({
-  origin: ['https://coinhunters.cc', 'http://localhost:3000', 'http://localhost:3001', process.env.FRONTEND_ORIGIN]
+  origin: function (origin, callback) {
+    callback(null, true)
+  } 
 }));
 
 app.use(helmet());

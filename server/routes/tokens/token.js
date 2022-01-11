@@ -20,14 +20,13 @@ router.get('/info/:contract',
         let tokenInfo = {};
 
         let tokenRetrived = await Services.token.findByContract( contract );
-        console.log('RETRIVED TOKEN: ', tokenRetrived );
         if( tokenRetrived ) tokenInfo = tokenRetrived;
 
         let pair = await Services.token.getMainPair( contract );
         let tokenPrice = await Services.price.findPrice( pair );
 
         if( tokenPrice ) {
-            tokenInfo.pricescale = 10**(firstSignificant(tokenPrice) + 1) ;
+            tokenInfo.pricescale = 10**(firstSignificant(tokenPrice)) ;
             tokenInfo.minmov = 1;
         }
         
