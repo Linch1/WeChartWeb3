@@ -22,7 +22,7 @@ class HistoryPirce {
         .lean()
         .select({ time: 1 })
         .exec();
-        return latestPrice.time;
+        return latestPrice ? latestPrice.time : null;
     }
 
 }
