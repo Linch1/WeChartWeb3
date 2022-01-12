@@ -23,7 +23,7 @@ class Token {
             .select({ contract: 1, decimals: 1, pairs_count: 1, total_supply: 1, name: 1 })
             .lean()
             .exec();
-            console.log(`[LOADED TOKEN] ${token} `, tokenInfo);
+            console.log(`[LOADED TOKEN] ${token} `);
             if(tokenInfo) this.cache.setToken( token, tokenInfo );
             
             else this.cache.setToken( token, { notFound: true, date: Date.now() } );

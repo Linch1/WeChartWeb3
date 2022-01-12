@@ -16,6 +16,14 @@ class HistoryPirce {
         }
         return latestPrice;
     }
+    async getLastHistoryTime( pair, time ){
+        let latestPrice = await HistoryPirceModel
+        .findOne( { pair: pair,  time: { $lte: time } } )
+        .lean()
+        .select({ time: 1 })
+        .exec();
+        return latestPrice.time;
+    }
 
 }
 module.exports = HistoryPirce;

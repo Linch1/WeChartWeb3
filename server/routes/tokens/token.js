@@ -26,7 +26,7 @@ router.get('/info/:contract',
         let tokenPrice = await Services.price.findPrice( pair );
 
         if( tokenPrice ) {
-            tokenInfo.pricescale = 10**(firstSignificant(tokenPrice)) ;
+            tokenInfo.pricescale = 10**(firstSignificant(tokenPrice) + 3 ) ;
             tokenInfo.minmov = 1;
         }
         

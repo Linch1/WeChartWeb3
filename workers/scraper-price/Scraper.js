@@ -196,7 +196,7 @@ class Scraper {
         let latestHigh = latestHistory ? latestHistory.high : 0;
         let latestLow = latestHistory ? latestHistory.low : 0 ;
 
-        console.log(`[UPDATING PRICE]`, pair, latestHistory)
+        console.log(`[UPDATING PRICE]`, pair)
 
         if( ( time - latestHistoryTime ) < this.UPDATE_PRICE_INTERVAL ){ // update latest record
             
@@ -213,7 +213,11 @@ class Scraper {
             
             
         } else { // create new record  
-            if( latestHistoryTime ){
+
+            if( !latestHistoryTime)  // load the time of the last time that this price was updated so that we can change the 'close' parameter
+                latestHistoryTime = this.historyPrices.getLastHistoryTime(pair, time);
+            if( latestHistoryTime ){ // update the close parameter
+                console.log(`[CLOSE] UPDATING ${latestHistoryTime} WITH ${newPrice}. ${pair}`)
                 this.bulk.bulk_time.setTokenBulkSet( pair, EnumBulkTypes.HISTORY_PRICE, latestHistoryTime, 'close', newPrice );
             }
                 

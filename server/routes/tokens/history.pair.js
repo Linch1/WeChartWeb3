@@ -20,6 +20,7 @@ router.get('/:pair',
             if(!last_history) return res.status(200).send({ success: { msg: "success", data: [] }});
             return res.status(200).send({ success: { msg: "success", data: [], nextTime: last_history.time }});
         }
+        
         return res.status(200).send({ success: { msg: "success", data: priceRecords }});
     }
 )

@@ -9,16 +9,18 @@ async function findPrices( pair, from, to, recordsCount ){
         { pair: pair.toLowerCase(), time: { $lt: parseInt(to), $gte: parseInt(from) } }
     ).count();
 
-    let records = [];
-    if( recordsRetrived >= recordsCount ){
-        records = await HistoryPrice.find(
-            { pair: pair.toLowerCase(), time: { $lt: parseInt(to), $gte: parseInt(from) } }
-        ).lean().limit(recordsCount).select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).exec();
-    } else {
-        records = await HistoryPrice.find(
-            { pair: pair.toLowerCase(), time: { $lt: parseInt(to), /* $gte: parseInt(from) */ } }
-        ).lean().limit(recordsCount).select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).exec();
-    }
+    let records = await HistoryPrice.find(
+      { pair: pair.toLowerCase(), time: { $lt: parseInt(to), $gte: parseInt(from) } }
+    ).lean().limit(recordsCount).select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).exec();
+    // if( recordsRetrived >= recordsCount ){
+    //     records = await HistoryPrice.find(
+    //         { pair: pair.toLowerCase(), time: { $lt: parseInt(to), $gte: parseInt(from) } }
+    //     ).lean().limit(recordsCount).select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).sort({ time: -1 }).exec();
+    // } else {
+    //     records = await HistoryPrice.find(
+    //         { pair: pair.toLowerCase(), time: { $lt: parseInt(to), /* $gte: parseInt(from) */ } }
+    //     ).lean().limit(recordsCount).select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).sort({ time: -1 }).exec();
+    // }
 
     return records;
 }
@@ -27,7 +29,7 @@ async function findLastPrice( pair, from, to ){
 
     let record = await HistoryPrice.findOne(
         { pair: pair.toLowerCase(), time: { $lt: parseInt(from) } }
-    ).lean().sort({ time: -1 }).select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).exec();
+    ).lean().select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).sort({ time: -1 }).exec();
         
     return record;
 }
