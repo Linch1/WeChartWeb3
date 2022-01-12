@@ -24,11 +24,18 @@ class Token {
             .lean()
             .exec();
             console.log(`[LOADED TOKEN] ${token} `);
-            if(tokenInfo) this.cache.setToken( token, tokenInfo );
-            
-            else this.cache.setToken( token, { notFound: true, date: Date.now() } );
-
-            
+            if(!tokenInfo) {
+                let token_contract = await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].TOKEN, token );
+                let token_decimals = parseInt( await token_contract.methods.decimals().call() );
+                tokenInfo = {
+                    contract: token,
+                    pairs_count: 0,
+                    decimals: token_decimals,
+                    name: await token_contract.methods.name().call(),
+                    total_supply: parseInt( await token_contract.methods.totalSupply().call() )/(10**token_decimals),
+                }
+            }
+            this.cache.setToken( token, tokenInfo );
         } 
 
         if(tokenInfo && !tokenInfo.burned) tokenInfo.burned = (await this.getBurned(token))/10**tokenInfo.decimals;
