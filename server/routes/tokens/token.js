@@ -23,7 +23,7 @@ router.get('/info/:contract',
         if( tokenRetrived ) tokenInfo = tokenRetrived;
 
         let pair = await Services.token.getMainPair( contract );
-        let tokenPrice = await Services.price.findPrice( pair );
+        let tokenPrice = await Services.price.findPrice( pair.mainPair );
 
         if( tokenPrice ) {
             tokenInfo.pricescale = 10**(firstSignificant(tokenPrice) + 3 ) ;
@@ -50,10 +50,7 @@ router.get('/mainPairMultiple/',
         try { contracts = JSON.parse(contracts); } 
         catch (error) { return res.status(400).send({ error: { msg: "Invalid Parameters" }});  }
 
-        let pairsInfo = {}
-        for( let contract of contracts ){
-            pairsInfo[contract] = await Services.token.getMainPair( contract );
-        }
+        let pairsInfo = await Services.token.getMainPairMultiple( contracts ); 
         
         return res.status(200).send({ success: { msg: "success", data: pairsInfo }});
     }

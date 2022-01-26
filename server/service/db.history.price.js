@@ -5,22 +5,9 @@ async function findPrices( pair, from, to, recordsCount ){
     if( recordsCount > 350 ) recordsCount = 350;
     if( !pair || !from || !to ) return [];
 
-    let recordsRetrived = await HistoryPrice.find(
-        { pair: pair.toLowerCase(), time: { $lt: parseInt(to), $gte: parseInt(from) } }
-    ).count();
-
     let records = await HistoryPrice.find(
-      { pair: pair.toLowerCase(), time: { $lt: parseInt(to), $gte: parseInt(from) } }
+      { pair: pair.toLowerCase(), time: { $lt: parseInt(to), /*$gte: parseInt(from)*/ } }
     ).lean().limit(recordsCount).select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).exec();
-    // if( recordsRetrived >= recordsCount ){
-    //     records = await HistoryPrice.find(
-    //         { pair: pair.toLowerCase(), time: { $lt: parseInt(to), $gte: parseInt(from) } }
-    //     ).lean().limit(recordsCount).select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).sort({ time: -1 }).exec();
-    // } else {
-    //     records = await HistoryPrice.find(
-    //         { pair: pair.toLowerCase(), time: { $lt: parseInt(to), /* $gte: parseInt(from) */ } }
-    //     ).lean().limit(recordsCount).select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).sort({ time: -1 }).exec();
-    // }
 
     return records;
 }

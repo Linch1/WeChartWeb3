@@ -15,7 +15,9 @@ const HistoryPirce = require("./entity/HistoryPirce");
 abiDecoder.addABI(EnumAbi[EnumChainId.BSC].TOKEN);
 abiDecoder.addABI(EnumAbi[EnumChainId.BSC].ROUTERS.PANCAKE);
 
-
+function relDiff( today, yesterday ) {
+    return  100 * ( ( today - yesterday ) / ( (today+yesterday)/2 ) );
+}
 
 class Scraper {
     constructor ( web3, CHAIN_MAIN_TOKEN_PRICE ) {
@@ -159,8 +161,9 @@ class Scraper {
         let reserve0 = first_reserves[0]/10**token0Infos.decimals;
         let reserve1 = first_reserves[1]/10**token1Infos.decimals;
 
-        let pairPrice = await this.historyPrices.getHistory(pair_contract);
-        await this.updatePrice( pair_contract, dependantToken.contract, pairPrice, dependantTokenPrice, reserve0, reserve1 );
+        let pairHistory = await this.historyPrices.getHistory(pair_contract);
+
+        await this.updatePrice( pair_contract, dependantToken.contract, pairHistory.latest, dependantTokenPrice, reserve0, reserve1 );
 
         // update transactions object
         let time = this.getTime();
@@ -171,9 +174,18 @@ class Scraper {
             from: tx.from,
             pair: pair_contract
         });
+
         this.bulk.bulk_normal.setTokenBulkInc( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,`records_transactions`, 1 );
         this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'reserve0', reserve0);
         this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'reserve1', reserve1);
+        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'price', dependantTokenPrice);
+
+        let dayAgoHistoryPrice = pairHistory.day;
+        if( dayAgoHistoryPrice ){ // update daily variation percentage
+            let dailyVariation = relDiff(dependantTokenPrice, dayAgoHistoryPrice.value).toFixed(2);
+            this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY, 'variation.day', dailyVariation );
+            console.log(`[UPDATING PERCENTAGE DAILY] ${pair_contract} ${dailyVariation}`)
+        }
 
         let mainReserveValue;
         if( mainToken.contract == token0 )  mainReserveValue = reserve0;
@@ -190,6 +202,7 @@ class Scraper {
         let tokenInfo = this.cache.getToken(tokenAddress);
         if( !newPrice ) return;
         
+
         let latestHistory = latestHistoryPirce;
         let latestHistoryTime = latestHistory ? latestHistory.time: 0;
 
@@ -214,13 +227,20 @@ class Scraper {
             
         } else { // create new record  
 
-            if( !latestHistoryTime)  // load the time of the last time that this price was updated so that we can change the 'close' parameter
-                latestHistoryTime = this.historyPrices.getLastHistoryTime(pair, time);
+            
+            if( !latestHistoryTime || typeof latestHistoryTime != 'number' ){  // load the time of the last time that this price was updated so that we can change the 'close' parameter
+                console.log(`[CLOSE RETRIVE] RETRIVING LAST HISTORY ${pair}. ${latestHistoryTime}`);
+                latestHistoryTime = await this.historyPrices.getLastHistoryTime(pair, time);
+                console.log(`[CLOSE RETRIVE] RETRIVED ${latestHistoryTime} ${pair}`)
+            }
             if( latestHistoryTime ){ // update the close parameter
                 console.log(`[CLOSE] UPDATING ${latestHistoryTime} WITH ${newPrice}. ${pair}`)
                 this.bulk.bulk_time.setTokenBulkSet( pair, EnumBulkTypes.HISTORY_PRICE, latestHistoryTime, 'close', newPrice );
+            } else {
+                console.log(`[CLOSE FAIL] CANNOT UPDATE ${latestHistoryTime} WITH ${newPrice}. ${pair}`)
             }
-                
+            
+            console.log(`[CREATING RECORD] ${pair}. LAST RECORD: ${latestHistoryTime}`);
             this.bulk.bulk_time.setNewDocument( pair, EnumBulkTypes.HISTORY_PRICE, time, {
                 time: time, // to have standard intervals, for example the exact minutes on the time. 9:01, 9:02, 9:03
                 open: newPrice,

@@ -25,12 +25,16 @@ var tokenHistorySchema = mongoose.Schema({
     burned: Number,
     mcap: Number,
     value: Number,
+    price: Number,
     reserve0: Number,
     reserve1: Number,
     mainReserveValue: Number,
 
     variation: {
-        daily: Number
+        hour: Number,
+        day: Number,
+        week: Number,
+        month: Number
     }
     
 }, { timestamps: { createdAt: 'created_at' } });

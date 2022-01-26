@@ -7,7 +7,7 @@ router.get('/single/:contract',
     async function ( req, res ) {
         let contract = req.params.contract;
         let pair = await Services.token.getMainPair( contract );
-        let price = await Services.price.findPrice( pair );
+        let price = await Services.price.findPrice( pair.mainPair );
         if( !price ) return res.status(400).send({ error: { msg: "Cannot retrive the price", data: 0 }});
         return res.status(200).send({ success: { msg: "success", data: price }});
     }

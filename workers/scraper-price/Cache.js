@@ -12,7 +12,7 @@ class Cache {
         this.CACHE = {
             token: {}, // [tokenAddress] => TokenBasic object
             tokenHistory: {}, // [pairAddress] => TokenHistory object of this pair
-            historyPrice: {} // [pairAddress] => Latest History Price object of this pair
+            historyPrice: {} // [pairAddress] => { latest: Latest History Price , hour: One Hour Ago History Price, day: One Day Ago History Price }
         };
 
     }
@@ -66,6 +66,10 @@ class Cache {
     }
 
     setHistoryPrice( pair, history ){
+        if( this.CACHE.historyPrice[pair] ) { // if already present then just update the one in cache and quit
+            this.CACHE.historyPrice[pair] = history;
+            return;
+        }
         let cacheSize = this.getSizePirceHistory();
         if( cacheSize > this.TOKENS_CACHE_MAX_SIZE ){ // keeps the tokens cache with a fixed size
             let toRemove = this.PRICES_CACHE_ORDER.shift();

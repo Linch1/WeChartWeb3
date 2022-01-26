@@ -32,7 +32,10 @@ async function getPairs( contract ){
             mainReserveValue: pairInfos.mainReserveValue,
             name: pairInfos.token0.name, 
             router: pairInfos.router,
-            chain: pairInfos.chain
+            chain: pairInfos.chain,
+            value: pairInfos.value,
+            mcap: pairInfos.mcap,
+            variation: pairInfos.variation
         };
 
         if( pairInfos.mainToken == pairInfos.token0.contract ) pairs[pairInfos.pair].reserve = pairInfos.reserve0; 
@@ -70,7 +73,10 @@ async function getPairsMultiple( contracts ){
                 mainReserveValue: pairInfos.mainReserveValue,
                 name: pairInfos.token0.name, 
                 router: pairInfos.router,
-                chain: pairInfos.chain
+                chain: pairInfos.chain,
+                value: pairInfos.value,
+                mcap: pairInfos.mcap,
+                variation: pairInfos.variation
             };
     
             if( pairInfos.mainToken == pairInfos.token0.contract ) organizedPairs[token][pairInfos.pair].reserve = pairInfos.reserve0; 
@@ -87,26 +93,51 @@ async function getMainPair( contract ){
 
     let mainPair = null; // each token probably has a pair with bnb or main stable coins, and we prefer that ones
     let mainPairVal = 0;
+    let pairInfos = {};
 
     for( let pair in pairs ){
-        let pairInfos = pairs[pair];
+        let pairDetails = pairs[pair];
         
-        if( pairInfos.mainToken === EnumMainTokens[pairInfos.chain].MAIN ) {
-            if( pairInfos.mainReserveValue > mainPairVal ){
+        if( pairDetails.mainToken === EnumMainTokens[pairDetails.chain].MAIN ) {
+            if( pairDetails.mainReserveValue > mainPairVal ){
                 mainPair = pair;
-                mainPairVal = pairInfos.mainReserveValue;
+                mainPairVal = pairDetails.mainReserveValue;
+                pairInfos = pairDetails;
             }
         }
-        else if( EnumMainTokens[pairInfos.chain].STABLECOINS.includes( pairInfos.mainToken ) ) {
-            if( pairInfos.mainReserveValue > mainPairVal ) {
+        else if( EnumMainTokens[pairDetails.chain].STABLECOINS.includes( pairDetails.mainToken ) ) {
+            if( pairDetails.mainReserveValue > mainPairVal ) {
                 mainPair = pair;
-                mainPairVal = pairInfos.mainReserveValue;
+                mainPairVal = pairDetails.mainReserveValue;
+                pairInfos = pairDetails;
             }
         }
     }
 
-    if( !mainPair ) return Object.keys( pairs )[0]; // if no mainPair was found, return the first pair inside the object
-    else return mainPair;
+    if( !mainPair ) {
+        mainPair = Object.keys( pairs )[0];
+        let pairDetails = pairs[mainPair];
+        
+        if( !pairDetails )  return {
+            mainPair: null,
+            mainPairVal: 0,
+            pairInfos: {}
+        }
+
+        mainPairVal = pairDetails.mainReserveValue;
+        return {
+            mainPair: mainPair,
+            mainPairVal: mainPairVal,
+            pairInfos: pairDetails
+        }
+    } else {
+        return {
+            mainPair: mainPair,
+            mainPairVal: mainPairVal,
+            pairInfos: pairInfos
+        };
+    } ; // if no mainPair was found, return the first pair inside the object
+    
 }
 async function getMainPairMultiple( contracts ){
 
@@ -119,19 +150,21 @@ async function getMainPairMultiple( contracts ){
     let mainPairs = {};
     for( let token in tokensPairs ){
         let pairs = tokensPairs[token];
-        mainPairs[token] = { mainPair: null, mainPairVal: 0 }
+        mainPairs[token] = { mainPair: null, mainPairVal: 0, pairInfos: {} }
         for( let pair in pairs ){
             let pairInfos = pairs[pair];
             if( pairInfos.mainToken === EnumMainTokens[pairInfos.chain].MAIN ) {
                 if( pairInfos.mainReserveValue >  mainPairs[token].mainPairVal ){
                     mainPairs[token].mainPair = pair;
                     mainPairs[token].mainPairVal = pairInfos.mainReserveValue;
+                    mainPairs[token].pairInfos = pairInfos;
                 }
             }
             else if( EnumMainTokens[pairInfos.chain].STABLECOINS.includes( pairInfos.mainToken ) ) {
                 if( pairInfos.mainReserveValue >  mainPairs[token].mainPairVal ) {
                     mainPairs[token].mainPair = pair;
                     mainPairs[token].mainPairVal = pairInfos.mainReserveValue;
+                    mainPairs[token].pairInfos = pairInfos;
                 }
             }
         }

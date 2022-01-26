@@ -41,9 +41,8 @@ app.use(express.json({limit: '50mb'}));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 app.use(compression({ level: 6, threshold: 0 }));
 app.use(cors({
-  origin: function (origin, callback) {
-    callback(null, true)
-  } 
+  credentials: true, 
+  origin: [...JSON.parse(process.env.FRONTEND_URL)]
 }));
 
 app.use(helmet());
@@ -57,7 +56,7 @@ app.use( '/token/price', routesTokens.price );
 app.use( '/token/history', routesTokens.historyToken );
 app.use( '/pair/history', routesTokens.historyPair );
 
-app.use('*', (req, res) => { res.status(500).send({status: 'ok'}) });
+app.use('*', (req, res) => { res.status(500).send({status: '2. ok'}) });
 
 app.use(function(err, req, res, next) {
   res.status(500).send({
