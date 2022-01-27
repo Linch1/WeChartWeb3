@@ -50,6 +50,8 @@ async function getPairsMultiple( contracts ){
     }
 
     let tokensPairs = await ServiceHistory.findPairsMultiple( contracts );
+    if( !tokensPairs ) return {}
+    
     let pairsRetrived = {} // tokenAddress: { pairAddress => { reserve: num, name: name } }
     for( let pairRetrived of tokensPairs ){
         if(!pairsRetrived[pairRetrived.dependantToken]) pairsRetrived[pairRetrived.dependantToken] = [];
