@@ -63,7 +63,11 @@ async function updateMainTokenPrice(){
 
 async function loopUpdateMainTokenPrice(){
     while( true ){
-        await updateMainTokenPrice();
+        try {
+            await updateMainTokenPrice();
+        } catch (error) {
+            console.log(`[ERR UPDATING MAIN PRICE] ${error}`);
+        }
         await sleep(UPDATE_MAIN_TOKEN_INTERVAL);
     }
 }

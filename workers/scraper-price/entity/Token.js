@@ -25,15 +25,20 @@ class Token {
             .exec();
             console.log(`[LOADED TOKEN] ${token} `);
             if(!tokenInfo) {
-                let token_contract = await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].TOKEN, token );
-                let token_decimals = parseInt( await token_contract.methods.decimals().call() );
-                tokenInfo = {
-                    contract: token,
-                    pairs_count: 0,
-                    decimals: token_decimals,
-                    name: await token_contract.methods.name().call(),
-                    total_supply: parseInt( await token_contract.methods.totalSupply().call() )/(10**token_decimals),
+                try {
+                    let token_contract = await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].TOKEN, token );
+                    let token_decimals = parseInt( await token_contract.methods.decimals().call() );
+                    tokenInfo = {
+                        contract: token,
+                        pairs_count: 0,
+                        decimals: token_decimals,
+                        name: await token_contract.methods.name().call(),
+                        total_supply: parseInt( await token_contract.methods.totalSupply().call() )/(10**token_decimals),
+                    }
+                } catch (error) {
+                    console.log(`[ERR RETRIVING TOKEN INFOS] ${error} `)
                 }
+                
             }
             this.cache.setToken( token, tokenInfo );
         } 
@@ -43,10 +48,14 @@ class Token {
         return tokenInfo;
     }
     async getBurned( token ){
-        let tokenContract = await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].PAIR.PANCAKE, token );
-        let zeroAddAmount = await tokenContract.methods.balanceOf("0x0000000000000000000000000000000000000000").call();
-        let burnAddAmount = await tokenContract.methods.balanceOf("0x000000000000000000000000000000000000dEaD").call();
-        return zeroAddAmount + burnAddAmount;
+        try {
+            let tokenContract = await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].PAIR.PANCAKE, token );
+            let zeroAddAmount = await tokenContract.methods.balanceOf("0x0000000000000000000000000000000000000000").call();
+            let burnAddAmount = await tokenContract.methods.balanceOf("0x000000000000000000000000000000000000dEaD").call();
+            return zeroAddAmount + burnAddAmount;
+        } catch (error) {
+            console.log(`[ERR RETRIVING TOKEN BURNED] ${error} `)
+        }
     }
 }
 
