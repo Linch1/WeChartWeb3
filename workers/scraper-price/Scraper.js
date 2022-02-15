@@ -79,10 +79,10 @@ class Scraper {
         //let [ secondToken0Add, secondToken1Add ] =  path[path.length-2] < path[path.length-1] ? [path[path.length-2], path[path.length-1]] : [path[path.length-1], path[path.length-2]]; // get the bought token
         
         // in developend to test things out just consider usdt token
-        if( 
-            firstToken0Add.toLowerCase() != '0x55d398326f99059ff775485246999027b3197955'.toLowerCase() &&
-            firstToken1Add.toLowerCase() != '0x55d398326f99059ff775485246999027b3197955'.toLowerCase()
-        ) return;
+        // if( 
+        //     firstToken0Add.toLowerCase() != '0x55d398326f99059ff775485246999027b3197955'.toLowerCase() &&
+        //     firstToken1Add.toLowerCase() != '0x55d398326f99059ff775485246999027b3197955'.toLowerCase()
+        // ) return;
 
         await this.updatePairPriceWithReserves(tx, tx.to, firstToken0Add.toLowerCase(), firstToken1Add.toLowerCase(), [ path[0], path[1] ]);    
     }
