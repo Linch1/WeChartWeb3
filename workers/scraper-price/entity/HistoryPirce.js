@@ -17,10 +17,12 @@ class HistoryPirce {
 
         if(!history.latest){
             let latestPrice = await HistoryPirceModel
-            .findOne( { pair: pair,  time: { $lte: now_unix } } )
+            .find( { pair: pair,  time: { $lte: now_unix } } )
+            .sort({ time: -1})
+            .limit(1)
             .lean()
             .exec();
-            history.latest = latestPrice;
+            history.latest = latestPrice[0];
             this.cache.setHistoryPrice( pair, history );
         }
 

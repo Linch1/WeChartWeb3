@@ -78,6 +78,12 @@ class Scraper {
         let [ firstToken0Add, firstToken1Add ] = path[0] < path[1] ? [path[0], path[1]] : [path[1], path[0]]; // get the sold token
         //let [ secondToken0Add, secondToken1Add ] =  path[path.length-2] < path[path.length-1] ? [path[path.length-2], path[path.length-1]] : [path[path.length-1], path[path.length-2]]; // get the bought token
         
+        // in developend to test things out just consider usdt token
+        if( 
+            firstToken0Add.toLowerCase() != '0x55d398326f99059ff775485246999027b3197955'.toLowerCase() &&
+            firstToken1Add.toLowerCase() != '0x55d398326f99059ff775485246999027b3197955'.toLowerCase()
+        ) return;
+
         await this.updatePairPriceWithReserves(tx, tx.to, firstToken0Add.toLowerCase(), firstToken1Add.toLowerCase(), [ path[0], path[1] ]);    
     }
 
@@ -118,7 +124,9 @@ class Scraper {
         if( !token0Infos || !token0Infos.contract || !token1Infos || !token1Infos.contract ) return;
 
         let [ mainToken, dependantToken ] = await this.tokenHierarchy(token0Infos, token1Infos, tokenHistory); // get who is the main token in the pair
-    
+        
+        
+
         let dependantTokenPrice = null; // calculate the dependant token price
         if( mainToken.contract == token0 ) dependantTokenPrice = (first_reserves[0]/10**mainToken.decimals)/(first_reserves[1]/10**dependantToken.decimals); // here decimals
         else dependantTokenPrice = (first_reserves[1]/10**mainToken.decimals)/(first_reserves[0]/10**dependantToken.decimals); 

@@ -8,7 +8,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "update-pairs": "node ./workers/pairs-update.js",
     "listen-pairs": "node ./workers/pairs-listen.js",
-    "scraper": "node ./workers/v2-scraper-price.js"
+    "scraper": "node ./workers/scraper-price.js"
   },
   "author": "",
   "license": "ISC",
