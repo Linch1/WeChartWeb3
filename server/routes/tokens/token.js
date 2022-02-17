@@ -68,6 +68,10 @@ router.get('/mainPair/:contract',
         let contract = req.params.contract;
         if( !contract ) return res.status(400).send({ error: { msg: "Invalid Parameters" }});
         let pair = await Services.token.getMainPair( contract );
+        
+        let transactions = await Services.transactions.findTransactions( pair.mainPair, 1 );
+        pair.transactions = transactions;
+
         if(!pair) res.status(400).send({ error: { msg: "Cannot retrive the token pairs", data: {} }})
         else return res.status(200).send({ success: { msg: "success", data: pair }});
     }

@@ -53,13 +53,36 @@ class BulkTime {
     }
    
     /**
-     * @description Add inside the bulk operations an insert 
-     * @param {*} pair address
-     * @param {*} historyToInsert object
+     * @description Add inside the bulk operations an insert, be aware that you can overwriting a document by setting always the same time
+     * @param {address} pair 
+     * @param {string} type 
+     * @param {number} time
+     * @param {object} record
+     * @param {boolean} overwrite specify if the record in the specified time should be overwrite the current one ( if present )
+     * @param {number} increase specifiy if instead of overwrite it should use another increased time
+     * @param {boolean} loop keep increasing the time to avoid an overwrite
      */
-    setNewDocument( pair, type, time, record  ){
+    setNewDocument( pair, type, time, record, overwrite = true, increase = 0, loop = false ){
         this.intializeBulkForContract( pair, type, time );
-        this.BulkWriteOperations[type][pair][time].insert = record;
+        // if it should not overwrite, and there is already a record in the specified time
+        if( !overwrite && this.BulkWriteOperations[type][pair][time].insert ) {
+            let newTime = time + increase;
+            if( loop ){
+                this.intializeBulkForContract( pair, type, newTime);
+                while( this.BulkWriteOperations[type][pair][newTime].insert ) {
+                    newTime = newTime + increase;
+                    this.intializeBulkForContract( pair, type, newTime);
+                    
+                }
+                this.BulkWriteOperations[type][pair][newTime].insert = record;
+            } else {
+                this.intializeBulkForContract( pair, type, newTime );
+                this.BulkWriteOperations[type][pair][newTime].insert = record;
+            }
+        } else {
+            this.BulkWriteOperations[type][pair][time].insert = record;
+        }
+        
 
         // update the price inside the cache instead of reading from the db
         if( type == EnumBulkTypes.HISTORY_PRICE ) {

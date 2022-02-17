@@ -7,8 +7,9 @@ var historyTransactionSchema = mongoose.Schema({
     hash: String,
 
     from: String,
-    sold: Number,
-    bought: Number,
+    
+    amount: Number,
+    
     value: Number, // estimated buy or sell price
 
     index: Number,

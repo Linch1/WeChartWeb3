@@ -38,4 +38,16 @@ router.get('/last/:pair',
         return res.status(200).send({ success: { msg: "success", data: [], nextTime: lastPrice.time }});
     }
 )
+router.get('/transactions/:pair/:page', 
+    async function ( req, res ) {
+        let pair = req.params.pair;
+        let page = parseInt(req.params.page);
+
+        if( !pair ) return res.status(400).send({ error: { msg: "Invalid params" }});
+
+        let transactions = await Services.transactions.findTransactions( pair, page );
+        if(!transactions) return res.status(400).send({ error: { msg: "cannot find transactions of the requested pair" }});
+        return res.status(200).send({ success: { msg: "success", data: transactions }});
+    }
+)
 module.exports = router;
