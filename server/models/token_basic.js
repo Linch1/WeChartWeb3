@@ -10,6 +10,6 @@ var tokenBasicSchema = mongoose.Schema({
     pairs_count: Number
 }, { timestamps: { createdAt: 'created_at' } });
 
-tokenBasicSchema.index({chain: 1, contract: 1, name: 1, symbol: 1, pairs_count: 1}, {unique: true});
+tokenBasicSchema.index({chain: 1, contract: 1, name: 1, pairs_count: 1});
 
 module.exports = mongoose.model('TokenBasic', tokenBasicSchema);

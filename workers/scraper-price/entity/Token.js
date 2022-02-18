@@ -25,20 +25,25 @@ class Token {
             .exec();
             console.log(`[LOADED TOKEN] ${token} `);
             if(!tokenInfo) {
+                let token_contract = await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].TOKEN, token );
+                let token_decimals;
+                let name;
+                let supply;
                 try {
-                    let token_contract = await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].TOKEN, token );
-                    let token_decimals = parseInt( await token_contract.methods.decimals().call() );
+                    token_decimals = parseInt( await token_contract.methods.decimals().call() );
+                    name = await token_contract.methods.name().call();
+                    supply = parseInt( await token_contract.methods.totalSupply().call() )/(10**token_decimals);
+
                     tokenInfo = {
                         contract: token,
                         pairs_count: 0,
                         decimals: token_decimals,
-                        name: await token_contract.methods.name().call(),
-                        total_supply: parseInt( await token_contract.methods.totalSupply().call() )/(10**token_decimals),
+                        name: name,
+                        total_supply: supply,
                     }
                 } catch (error) {
-                    console.log(`[ERR RETRIVING TOKEN INFOS] ${error} `)
+                    console.log('[ERROR] Cannot retrive token informations', error);
                 }
-                
             }
             this.cache.setToken( token, tokenInfo );
         } 
@@ -54,8 +59,9 @@ class Token {
             let burnAddAmount = await tokenContract.methods.balanceOf("0x000000000000000000000000000000000000dEaD").call();
             return zeroAddAmount + burnAddAmount;
         } catch (error) {
-            console.log(`[ERR RETRIVING TOKEN BURNED] ${error} `)
+            console.log(`[ERR RETRIVING TOKEN BURNED] ${error} `);
         }
+        return 0;
     }
 }
 

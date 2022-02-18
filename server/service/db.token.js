@@ -3,6 +3,7 @@ const EnumChainId = require('../../enum/chain.id');
 const EnumMainTokens = require('../../enum/mainTokens');
 var TokenBasic = require('../models/token_basic');
 var ServiceHistory = require('./db.history');
+let TOKENS_PER_PAGE = 25;
 
 async function findByContract( contract ){
     let tokenInfos = await TokenBasic.findOne({ contract: contract.toLowerCase() }).lean().exec();
@@ -13,6 +14,20 @@ async function getSymbolFromContract( contract ){
     let tokenInfos = await TokenBasic.findOne({ contract: contract.toLowerCase() }).select({ symbol: 1 }).lean().exec();
     if( !tokenInfos || tokenInfos.name == "$NULL" ) { return null }
     return tokenInfos.symbol;
+}
+async function searchByUrlOrContract( urlOrContract ){
+    let query = urlOrContract.trim().replace(/[^\w\s]/gi, '').split(" ").join("");
+    let tokens = await TokenBasic.find({ 
+        $or: [
+            {name: { $regex: '.*' + query + '.*', $options: 'i' }}, 
+            {contract: urlOrContract.toLowerCase() }
+        ] 
+    })
+    .select({ name: 1, symbol: 1, contract: 1 })
+    .sort({ pairs_count: -1 })
+    .limit(TOKENS_PER_PAGE)
+    .exec();
+    return tokens;
 }
 
 async function getPairs( contract ){
@@ -179,5 +194,6 @@ module.exports = {
     getSymbolFromContract,
     getMainPair,
     getMainPairMultiple,
-    getPairs
+    getPairs,
+    searchByUrlOrContract
 }

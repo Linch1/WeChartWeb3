@@ -14,9 +14,7 @@ router.get('/:token',
         if( !from || !to || !records || !pair ) return res.status(400).send({ error: { msg: "Invalid params", data: [] }});
 
         let start = Date.now();
-        console.log('FINDING PRICES: ', start);
         let priceRecords = await Services.price.findPrices( pair.mainPair, from, to, records  );
-        console.log('FOUND PRICES: ', (Date.now()-start)/1000 );
         if( !priceRecords || !priceRecords.length ) {
             let last_history = await Services.price.findLastPrice( pair.mainPair, from, to );
             if(!last_history) return res.status(200).send({ success: { msg: "success", data: [] }});
