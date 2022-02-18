@@ -82,16 +82,8 @@ class Scraper {
         
         // for each pair of path than update the pairs values
         for( let i = 0; i < path.length - 2; i ++ ){
-            console.log('[ITERATING] ', i);
             let [ firstToken0Add, firstToken1Add ] = path[i] < path[i+1] ? [path[i], path[i+1]] : [path[i+1], path[i]]; // get the sold token
-            //let [ secondToken0Add, secondToken1Add ] =  path[path.length-2] < path[path.length-1] ? [path[path.length-2], path[path.length-1]] : [path[path.length-1], path[path.length-2]]; // get the bought token
-            
-            // in developend to test things out just consider usdt token
-            // if( 
-            //     firstToken0Add.toLowerCase() != '0x55d398326f99059ff775485246999027b3197955'.toLowerCase() &&
-            //     firstToken1Add.toLowerCase() != '0x55d398326f99059ff775485246999027b3197955'.toLowerCase()
-            // ) return;
-
+            // update the amountIn with the returned value
             amountIn = await this.updatePairPriceWithReserves(
                 tx, tx.to, 
                 firstToken0Add.toLowerCase(), firstToken1Add.toLowerCase(), 
@@ -277,7 +269,7 @@ class Scraper {
 
         let time = this.getTime();
         console.log('[SETTING TRANSACTION] ', pair_contract, time)
-        this.bulk.bulk_time.setNewDocument( pair_contract, EnumBulkTypes.HISOTRY_TRANSACTION, time, {
+        this.bulk.bulk_time.setNewDocument( pair_contract, EnumBulkTypes.HISOTRY_TRANSACTION, Date.now()/1000, {
             time: time, // unix timestamp
             type: type, // [ buy -> type = 1 ]. [ sell -> type = 0 ]
             hash: tx.hash,

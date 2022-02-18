@@ -36,8 +36,6 @@ router.get('/multiple/',
             prices[ tokenContract ] = price.record.value;
         }
 
-        console.log('RETRIVED PRICES: ', retrivedPrices )
-
         return res.status(200).send({ success: { msg: "success", data: prices }});
     }
 )

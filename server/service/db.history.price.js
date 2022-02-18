@@ -5,16 +5,9 @@ async function findPrices( pair, from, to, recordsCount ){
     if( recordsCount > 350 ) recordsCount = 350;
     if( !pair || !from || !to ) return [];
 
-
-    console.log('From: ', new Date(from * 1000));
-    console.log('To: ', new Date(to * 1000) );
-
     let records = await HistoryPrice.find(
       { pair: pair.toLowerCase(), time: { $lt: parseInt(to), /*$gte: parseInt(from)*/ } }
     ).sort({time: -1}).lean().limit(recordsCount).select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).exec();
-
-    if(records[0]) console.log('First: ', new Date(records[0].time * 1000));
-    if(records[ records.length - 1 ]) console.log('Last: ', new Date(records[ records.length - 1 ].time * 1000) );
 
     return records;
 }

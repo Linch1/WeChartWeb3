@@ -2,6 +2,7 @@ require("dotenv").config();
 var express = require('express');
 const EnumChainId = require("../../../enum/chain.id");
 const EnumMainTokens = require("../../../enum/mainTokens");
+const ApiVoting = require("../../api/voting");
 var router = express.Router();
 let Services = require('../../service');
 
@@ -14,22 +15,56 @@ for( let tokenSymbol in mainTokens ) {
 function firstSignificant(n) {
     return Math.ceil(-Math.log10(n));
 }
+async function getTokenBasicInfos( contract ){
+    let tokenInfo = {};
+
+    let tokenRetrived = await Services.token.findByContract( contract );
+    if( tokenRetrived ) tokenInfo = tokenRetrived;
+
+    let pair = await mainPairHandler( contract );
+    let tokenPrice = pair.pairInfos.value;
+    tokenInfo.pair = pair;
+    if( tokenPrice ) {
+        tokenInfo.pricescale = 10**(firstSignificant(tokenPrice) + 3 ) ;
+        tokenInfo.minmov = 1;
+    }
+    return tokenInfo;
+}
+async function mainPairHandler( contract ) {
+    let pair = await Services.token.getMainPair( contract );
+    let transactions = await Services.transactions.findTransactions( pair.mainPair, 1 );
+    pair.transactions = transactions;
+    return pair;
+}
+router.get('/search/:url', 
+    async function(req, res) {
+        let url = req.params.url;
+        let tokens = await Services.token.searchByUrlOrContract(url);
+        // await ApiCharting.getTokensPair( tokens );
+        return res.status(200).send({ success: { msg: "success", data: tokens }})
+    }
+);
 router.get('/info/:contract', 
     async function ( req, res ) {
         let contract = req.params.contract;
-        let tokenInfo = {};
+        let tokenInfo = await getTokenBasicInfos( contract );
 
-        let tokenRetrived = await Services.token.findByContract( contract );
-        if( tokenRetrived ) tokenInfo = tokenRetrived;
-
-        let pair = await Services.token.getMainPair( contract );
-        let tokenPrice = await Services.price.findPrice( pair.mainPair );
-
-        if( tokenPrice ) {
-            tokenInfo.pricescale = 10**(firstSignificant(tokenPrice) + 3 ) ;
-            tokenInfo.minmov = 1;
+        // implemented custom endpoint to retrive informations 
+        let fromVoting = await ApiVoting.getTokenInfos( contract );
+        if( fromVoting.success ) {
+            let data = fromVoting.success.data;
+            delete data._id;
+            tokenInfo = {...tokenInfo, ...data }
         }
-        
+        // end custom
+
+        return res.status(200).send({ success: { msg: "success", data: tokenInfo }});
+    }
+)
+router.get('/basic/:contract', 
+    async function ( req, res ) {
+        let contract = req.params.contract;
+        let tokenInfo = await getTokenBasicInfos( contract );
         return res.status(200).send({ success: { msg: "success", data: tokenInfo }});
     }
 )
@@ -63,14 +98,14 @@ router.get('/mainPairs/:contract',
         return res.status(200).send({ success: { msg: "success", data: pairs }});
     }
 )
+
+
 router.get('/mainPair/:contract', 
     async function ( req, res ) {
         let contract = req.params.contract;
         if( !contract ) return res.status(400).send({ error: { msg: "Invalid Parameters" }});
-        let pair = await Services.token.getMainPair( contract );
-        
-        let transactions = await Services.transactions.findTransactions( pair.mainPair, 1 );
-        pair.transactions = transactions;
+
+        let pair = await mainPairHandler(contract)
 
         if(!pair) res.status(400).send({ error: { msg: "Cannot retrive the token pairs", data: {} }})
         else return res.status(200).send({ success: { msg: "success", data: pair }});
