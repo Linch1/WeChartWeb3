@@ -10,7 +10,7 @@ async function findPrices( pair, from, to, recordsCount ){
     console.log('To: ', new Date(to * 1000) );
 
     let records = await HistoryPrice.find(
-      { pair: pair.toLowerCase(), time: { $lt: parseInt(to), /*$gte: parseInt(from)*/ } }
+      { pair: pair.toLowerCase(), time: { $lt: parseInt(to) } }
     ).sort({time: -1}).lean().limit(recordsCount).select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).exec();
 
     if(records[0]) console.log('First: ', new Date(records[0].time * 1000));
