@@ -45,12 +45,15 @@ async function getPairs( contract ){
         pairs[pairInfos.pair] = { 
             mainToken: pairInfos.mainToken, 
             mainReserveValue: pairInfos.mainReserveValue,
-            name: pairInfos.token0.name, 
             router: pairInfos.router,
             chain: pairInfos.chain,
             value: pairInfos.value,
             mcap: pairInfos.mcap,
-            variation: pairInfos.variation
+            variation: pairInfos.variation,
+            tokens: {
+                0: pairInfos.token0.name,
+                1: pairInfos.token1.name
+            }
         };
 
         if( pairInfos.mainToken == pairInfos.token0.contract ) pairs[pairInfos.pair].reserve = pairInfos.reserve0; 
@@ -104,10 +107,34 @@ async function getPairsMultiple( contracts ){
     return organizedPairs;
 }
 
+async function getSupplyMultiple( contracts ){
+    for( let i in contracts ) contracts[i] = contracts[i].toLowerCase();
+    
+    let retrivedSupplies = await findSupplyMultiple( contracts );
+    let retrived = {};
+    if(retrivedSupplies && retrivedSupplies.length ) {
+        for( let info of retrivedSupplies ){
+            retrived[ info.contract ] = info.total_supply;
+        }
+    }
+    return retrived;
+}
+
+async function findSupplyMultiple( contracts ){
+    let documents = await TokenBasic.find(
+        { contract: { $in: contracts } }
+    ).select({ contract: 1, total_supply: 1 }).lean().exec();
+    if(!documents.length) return null;
+    return documents;
+}
+
 async function getMainPair( contract ){
 
     let pairs = await getPairs( contract.toLowerCase() ) // tokenAddress => pair informations
 
+    let token = await TokenBasic.findOne({contract : contract}).select({total_supply: 1}).lean().exec();
+    let totalSupply = token.total_supply;
+   
     let mainPair = null; // each token probably has a pair with bnb or main stable coins, and we prefer that ones
     let mainPairVal = 0;
     let pairInfos = {};
@@ -138,20 +165,23 @@ async function getMainPair( contract ){
         if( !pairDetails )  return {
             mainPair: null,
             mainPairVal: 0,
-            pairInfos: {}
+            pairInfos: {},
+            totalSupply: totalSupply
         }
 
         mainPairVal = pairDetails.mainReserveValue;
         return {
             mainPair: mainPair,
             mainPairVal: mainPairVal,
-            pairInfos: pairDetails
+            pairInfos: pairDetails,
+            totalSupply: totalSupply
         }
     } else {
         return {
             mainPair: mainPair,
             mainPairVal: mainPairVal,
-            pairInfos: pairInfos
+            pairInfos: pairInfos,
+            totalSupply: totalSupply
         };
     } ; // if no mainPair was found, return the first pair inside the object
     
@@ -163,11 +193,12 @@ async function getMainPairMultiple( contracts ){
     }
 
     let tokensPairs = await getPairsMultiple( contracts ) // tokenAddress => { pair address: pair informations }
+    let tokensSupplies = await getSupplyMultiple( contracts )
 
     let mainPairs = {};
     for( let token in tokensPairs ){
         let pairs = tokensPairs[token];
-        mainPairs[token] = { mainPair: null, mainPairVal: 0, pairInfos: {} }
+        mainPairs[token] = { mainPair: null, mainPairVal: 0, pairInfos: {}, totalSupply: tokensSupplies[token] }
         for( let pair in pairs ){
             let pairInfos = pairs[pair];
             if( pairInfos.mainToken === EnumMainTokens[pairInfos.chain].MAIN ) {

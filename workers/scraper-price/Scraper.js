@@ -269,9 +269,9 @@ class Scraper {
 
         }
 
-        let time = this.getTime();
+        let time = Date.now()/1000;
         console.log('[SETTING TRANSACTION] ', pair_contract, time)
-        this.bulk.bulk_time.setNewDocument( pair_contract, EnumBulkTypes.HISOTRY_TRANSACTION, Date.now()/1000, {
+        this.bulk.bulk_time.setNewDocument( pair_contract, EnumBulkTypes.HISOTRY_TRANSACTION, time, {
             time: time, // unix timestamp
             type: type, // [ buy -> type = 1 ]. [ sell -> type = 0 ]
             hash: tx.hash,
