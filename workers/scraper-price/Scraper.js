@@ -6,12 +6,14 @@ const Cache = require("./Cache");
 const Token = require("./entity/Token");
 const Pair = require('./Pair');
 
-const abiDecoder = require('abi-decoder');
+
 const EnumAbi = require("../../enum/abi");
 const EnumMainTokens = require("../../enum/mainTokens");
 const EnumBulkTypes = require("../../enum/bulk.records.type");
 const TokenHistory = require("./entity/TokenHistory");
 const HistoryPirce = require("./entity/HistoryPirce");
+
+const abiDecoder = require('abi-decoder');
 abiDecoder.addABI(EnumAbi[EnumChainId.BSC].TOKEN);
 abiDecoder.addABI(EnumAbi[EnumChainId.BSC].ROUTERS.PANCAKE);
 
