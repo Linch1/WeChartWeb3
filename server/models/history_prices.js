@@ -16,6 +16,6 @@ var historyPriceSchema = mongoose.Schema({
 });
 historyPriceSchema.index({ 
     time: 1, pair: 1
-}, {unique: true});
+});
 module.exports = mongoose.model('historyPirce', historyPriceSchema);
 

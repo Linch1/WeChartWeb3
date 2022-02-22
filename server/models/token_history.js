@@ -42,5 +42,5 @@ tokenHistorySchema.index({
     'token0.contract': 1, 'token1.contract': 1, 
     'variation.daily': 1, pair: 1, router: 1,
     chain: 1
-}, {unique: true});
+});
 module.exports = mongoose.model('TokenHistory', tokenHistorySchema);

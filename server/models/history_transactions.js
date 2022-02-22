@@ -17,6 +17,6 @@ var historyTransactionSchema = mongoose.Schema({
 });
 historyTransactionSchema.index({ 
     time: 1, pair: 1
-}, {unique: true});
+});
 module.exports = mongoose.model('historyTransaction', historyTransactionSchema);
 
