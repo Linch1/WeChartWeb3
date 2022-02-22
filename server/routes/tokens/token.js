@@ -50,6 +50,9 @@ router.get('/info/:contract',
         let tokenInfo = await getTokenBasicInfos( contract );
 
         // implemented custom endpoint to retrive informations 
+        let allPairs = await Services.token.getPairs( contract );
+        tokenInfo.pairs = allPairs;
+
         let fromVoting = await ApiVoting.getTokenInfos( contract );
         if( fromVoting.success ) {
             let data = fromVoting.success.data;
@@ -90,6 +93,17 @@ router.get('/mainPairMultiple/',
         return res.status(200).send({ success: { msg: "success", data: pairsInfo }});
     }
 )
+router.get('/mainPair/:contract', 
+    async function ( req, res ) {
+        let contract = req.params.contract;
+        if( !contract ) return res.status(400).send({ error: { msg: "Invalid Parameters" }});
+
+        let pair = await mainPairHandler(contract)
+        
+        if(!pair) res.status(400).send({ error: { msg: "Cannot retrive the token pairs", data: {} }})
+        else return res.status(200).send({ success: { msg: "success", data: pair }});
+    }
+)
 router.get('/mainPairs/:contract', 
     async function ( req, res ) {
         let contract = req.params.contract;
@@ -100,17 +114,7 @@ router.get('/mainPairs/:contract',
 )
 
 
-router.get('/mainPair/:contract', 
-    async function ( req, res ) {
-        let contract = req.params.contract;
-        if( !contract ) return res.status(400).send({ error: { msg: "Invalid Parameters" }});
 
-        let pair = await mainPairHandler(contract)
-
-        if(!pair) res.status(400).send({ error: { msg: "Cannot retrive the token pairs", data: {} }})
-        else return res.status(200).send({ success: { msg: "success", data: pair }});
-    }
-)
 
 
 
