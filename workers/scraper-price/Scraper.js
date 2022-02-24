@@ -24,7 +24,7 @@ function relDiff( today, yesterday ) {
 class Scraper {
     constructor ( web3, CHAIN_MAIN_TOKEN_PRICE ) {
         this.web3 = web3;
-        this.UPDATE_PRICE_INTERVAL = 60 ; // push the new prices to the db every 60 seconds
+        this.UPDATE_PRICE_INTERVAL = process.env.WRITE_TO_DB_SECONDS ; // create a new record for the prices every x seconds
         this.CHAIN_MAIN_TOKEN_PRICE = CHAIN_MAIN_TOKEN_PRICE;
 
         this.METHODS = [ // methods used for swap the tokens
@@ -159,11 +159,13 @@ class Scraper {
                 chain: EnumChainId.BSC,
                 token0: {
                     contract: token0Infos.contract,
-                    name: token0Infos.name
+                    name: token0Infos.name,
+                    symbol: token0Infos.symbol
                 },
                 token1: {
                     contract: token1Infos.contract,
-                    name: token1Infos.name
+                    name: token1Infos.name,
+                    symbol: token1Infos.symbol
                 },
                 router: router,
                 pair: pair_contract,
@@ -184,7 +186,11 @@ class Scraper {
 
         let pairHistory = await this.historyPrices.getHistory(pair_contract);
 
-        await this.updatePrice( pair_contract, dependantToken.contract, pairHistory.latest, dependantTokenPrice, reserve0, reserve1 );
+        await this.updatePrice( 
+            router, pair_contract, dependantToken.contract, mainToken.contract,
+            pairHistory.latest, dependantTokenPrice, 
+            reserve0, reserve1 
+        );
 
         // update the pair records
         this.bulk.bulk_normal.setTokenBulkInc( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,`records_transactions`, 1 );
@@ -265,8 +271,6 @@ class Scraper {
             transferredTokensValue = amountOut * mainTokenPrice;
             transferredTokensAmount = (amountIn/10**dependantToken.decimals);
             type = 1;
-
-
         }
 
         let time = Date.now()/1000;
@@ -276,9 +280,12 @@ class Scraper {
             type: type, // [ buy -> type = 1 ]. [ sell -> type = 0 ]
             hash: tx.hash,
             from: tx.from,
-            pair: pair_contract,
             value: transferredTokensValue,
-            amount: transferredTokensAmount
+            amount: transferredTokensAmount,
+            pair: pair_contract,
+            router: router,
+            dependantToken: dependantToken.contract,
+            mainToken: mainToken.contract
         }, false, 0.0001, true);
 
         return amountOutWithDecimals;
@@ -287,7 +294,7 @@ class Scraper {
 
     getTime() { return Math.floor((Date.now()/1000)/this.UPDATE_PRICE_INTERVAL) * this.UPDATE_PRICE_INTERVAL }
     addDecimals( value, decimals ){ return value/10**decimals }
-    async updatePrice( pair, tokenAddress, latestHistoryPirce, newPrice, reserve0, reserve1 ) {
+    async updatePrice( router, pair, tokenAddress, mainTokenAddress, latestHistoryPirce, newPrice, reserve0, reserve1 ) {
     
         let time = this.getTime();
         let tokenInfo = this.cache.getToken(tokenAddress);
@@ -342,7 +349,10 @@ class Scraper {
                 burned: tokenInfo ? tokenInfo.burned : null,
                 mcap: tokenInfo ? (tokenInfo.total_supply - tokenInfo.burned) * newPrice : 0,
       
-                pair: pair
+                pair: pair,
+                router: router,
+                mainToken: mainTokenAddress,
+                dependantToken: tokenAddress
             } );
 
             if( tokenInfo ) {

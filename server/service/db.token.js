@@ -23,10 +23,11 @@ async function searchByUrlOrContract( urlOrContract ){
             {contract: urlOrContract.toLowerCase() }
         ] 
     })
-    .select({ name: 1, symbol: 1, contract: 1 })
+    .select({ name: 1, symbol: 1, contract: 1, pairs_count: 1 })
     .sort({ pairs_count: -1 })
     .limit(TOKENS_PER_PAGE)
     .exec();
+
     return tokens;
 }
 
@@ -51,8 +52,8 @@ async function getPairs( contract ){
             mcap: pairInfos.mcap,
             variation: pairInfos.variation,
             tokens: {
-                0: pairInfos.token0.name,
-                1: pairInfos.token1.name
+                0: pairInfos.token0.symbol,
+                1: pairInfos.token1.symbol
             }
         };
 

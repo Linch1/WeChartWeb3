@@ -12,10 +12,14 @@ var historyPriceSchema = mongoose.Schema({
     dependantValue: Number, // the value based on the token with which it is in pair
 
     index: Number,
-    pair: String
+    pair: String,
+    router: String,
+    mainToken: String,
+    dependantToken: String,
 });
-historyPriceSchema.index({ 
-    time: 1, pair: 1
-}, {unique: true});
+historyPriceSchema.index({ pair: 1 });
+historyPriceSchema.index({  dependantToken: 1 });
+historyPriceSchema.index({  mainToken: 1 });
+historyPriceSchema.index({ router: 1 });
 module.exports = mongoose.model('historyPirce', historyPriceSchema);
 

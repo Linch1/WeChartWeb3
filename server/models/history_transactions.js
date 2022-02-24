@@ -13,10 +13,14 @@ var historyTransactionSchema = mongoose.Schema({
     value: Number, // estimated buy or sell price
 
     index: Number,
-    pair: String
+    pair: String,
+    mainToken: String,
+    dependantToken: String,
+    router: String
 });
-historyTransactionSchema.index({ 
-    time: 1, pair: 1
-}, {unique: true});
+historyTransactionSchema.index({  pair: 1 });
+historyTransactionSchema.index({  dependantToken: 1 });
+historyTransactionSchema.index({  mainToken: 1 });
+historyTransactionSchema.index({  router: 1 });
 module.exports = mongoose.model('historyTransaction', historyTransactionSchema);
 

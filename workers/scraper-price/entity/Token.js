@@ -29,16 +29,19 @@ class Token {
                 let token_decimals;
                 let name;
                 let supply;
+                let symbol;
                 try {
                     token_decimals = parseInt( await token_contract.methods.decimals().call() );
                     name = await token_contract.methods.name().call();
                     supply = parseInt( await token_contract.methods.totalSupply().call() )/(10**token_decimals);
+                    symbol = await token_contract.methods.symbol().call();
 
                     tokenInfo = {
                         contract: token,
                         pairs_count: 0,
                         decimals: token_decimals,
                         name: name,
+                        symbol: symbol,
                         total_supply: supply,
                     }
                 } catch (error) {

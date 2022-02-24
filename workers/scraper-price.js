@@ -329,14 +329,14 @@ async function scanBlockRange(startingBlock, stoppingBlock, callback) {
      * and to take advandage of the bulk operations by aggregating all the stored queries
      * @returns 
      */
-    function getUnixMinute( timeMs ) { return Math.floor( (timeMs/1000) /60) * 60; }
+    function getWriteTime( timeMs ) { return Math.floor( (timeMs/1000) / process.env.WRITE_TO_DB_SECONDS) * process.env.WRITE_TO_DB_SECONDS; }
+
     async function loopUpdateOnDb(){
         while(true){
-            let now = getUnixMinute(Date.now());
-            // push the updates every minute change to optimize the writes on the database
-            if( now != getUnixMinute( Date.now() + 1000 ) )  await scraper.bulk.execute();
+            let now = getWriteTime(Date.now());
             await sleep(1000);
-
+            // push the updates every minute change to optimize the writes on the database
+            if( now != getWriteTime( Date.now() + 1000 ) )  await scraper.bulk.execute();
             // await sleep(5000);
             // await scraper.bulk.execute();
         }

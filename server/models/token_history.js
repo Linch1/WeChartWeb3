@@ -12,11 +12,13 @@ var tokenHistorySchema = mongoose.Schema({
 
     token0: {
         contract: String,
-        name: String
+        name: String,
+        symbol: String
     },
     token1: {
         contract: String,
-        name: String
+        name: String,
+        symbol: String
     },
 
     mainToken: String,
