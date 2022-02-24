@@ -134,7 +134,7 @@ async function getMainPair( contract ){
     let pairs = await getPairs( contract.toLowerCase() ) // tokenAddress => pair informations
 
     let token = await TokenBasic.findOne({contract : contract}).select({total_supply: 1}).lean().exec();
-    let totalSupply = token.total_supply;
+    let totalSupply = token ? token.total_supply : 0;
    
     let mainPair = null; // each token probably has a pair with bnb or main stable coins, and we prefer that ones
     let mainPairVal = 0;
