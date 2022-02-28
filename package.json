@@ -19,6 +19,7 @@
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^10.0.0",
+    "ethers": "^5.5.4",
     "express": "^4.17.2",
     "fs": "*",
     "helmet": "^4.6.0",
