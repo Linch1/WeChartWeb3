@@ -83,7 +83,7 @@ class Scraper {
         }
         
         // for each pair of path than update the pairs values
-        for( let i = 0; i < path.length - 2; i ++ ){
+        for( let i = 0; i <= path.length - 2; i ++ ){
             let [ firstToken0Add, firstToken1Add ] = path[i] < path[i+1] ? [path[i], path[i+1]] : [path[i+1], path[i]]; // get the sold token
             // update the amountIn with the returned value
             amountIn = await this.updatePairPriceWithReserves(
