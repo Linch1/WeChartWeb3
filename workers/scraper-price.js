@@ -28,7 +28,7 @@ var configDB = require('../server/config/database');
 const mongoose = require('mongoose');
 
 let Web3 = require('web3');
-let web3 = new Web3(process.env.PROVIDER); // Initialize Ethereum Web3 client
+let web3 = new Web3(process.env.PROVIDER_WSS); // Initialize Ethereum Web3 client
 
 let MAIN_TOKEN_PRICE = [0];
 
@@ -122,12 +122,9 @@ async function scanTransactionCallback(txn, pairAddress) {
             return console.log( error );
 
         let pair = tx.address;
-        scanTransactionCallback(tx, pair) // for each swap scan the tranasction
+        scanTransactionCallback(tx, pair.toLowerCase()) // for each swap scan the tranasction
 
     })
-    .on("data", async function(tx){
-        
-    });
 
     // unsubscribes the subscription
     subscription.unsubscribe(function(error, success){

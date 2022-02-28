@@ -19,12 +19,15 @@ abiDecoder.addABI(EnumAbi[EnumChainId.BSC].ROUTERS.PANCAKE);
 function relDiff( today, yesterday ) {
     return  100 * ( ( today - yesterday ) / ( (today+yesterday)/2 ) );
 }
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-class Scraper {
-    constructor ( web3, CHAIN_MAIN_TOKEN_PRICE ) {
+class ScraperSpecific {
+    constructor ( web3 ) {
         this.web3 = web3;
         this.UPDATE_PRICE_INTERVAL = process.env.WRITE_TO_DB_SECONDS ; // create a new record for the prices every x seconds
-        this.CHAIN_MAIN_TOKEN_PRICE = CHAIN_MAIN_TOKEN_PRICE;
+        this.CHAIN_MAIN_TOKEN_PRICE = 0;
 
         this.ROUTERS = []; // the routers allowed
         for( let router of Object.values(EnumContracts[EnumChainId.BSC].ROUTERS) ) this.ROUTERS.push(router.toLowerCase() );
@@ -35,49 +38,9 @@ class Scraper {
         this.tokens = new Token( this.cache, this.web3 );
         this.tokenHistories = new TokenHistory( this.cache );
         this.historyPrices = new HistoryPirce( this.cache );
+        this.loopUpdateMainTokenPrice();
     }
 
-    async calculatePriceFromReserves( txLogs, pairAddress ) {
-
-        let hash = txLogs.transactionHash.toLowerCase();
-        let tx = await this.web3.eth.getTransaction(hash);
-        let sender = tx.from.toLowerCase();
-        let reciver = tx.to.toLowerCase();
-        
-        
-        // get the transaction reciept
-        let tx_data = tx.data; // get the swap parameters
-        if( !tx_data ) tx_data = tx.input; // the .data property sometime is in the .input field
-        if( !tx_data ) { return; }
-
-        let decoded_data = abiDecoder.decodeMethod(tx_data); // decode the parameters of the transaction
-        if( !decoded_data ) return; // return if wasn't able to decode the datas of the transaction
-        
-        let amountIn;
-        let params = decoded_data.params; // decoded parameters
-        let path = [];
-        for(let i in params){  // loop to print parameters without unnecessary info
-            if( params[i].name == 'path' ) path = params[i].value;
-            if(  params[i].name == 'amountIn' ||  params[i].name == 'amountInMax' ) amountIn = params[i].value; // get the amounts of token used as input
-        }
-        if( !path[0] ) return; // return if the path has no values
-        if( path[0].toLowerCase() == EnumMainTokens [EnumChainId.BSC].MAIN )  {
-            if( !amountIn ) amountIn = tx.value;
-        }
-
-        let [ firstToken0Add, firstToken1Add ] = path[0] < path[1] ? [path[0], path[1]] : [path[1], path[0]];
-
-        amountIn = await this.updatePairPriceWithReserves(
-            sender,
-            reciver,
-            hash,
-            firstToken0Add.toLowerCase(), firstToken1Add.toLowerCase(), 
-            [ path[0].toLowerCase(), path[1].toLowerCase() ],
-            amountIn,
-            pairAddress
-        );
-
-    }
 
     // returns an array [ mainToken, dependantToken ];
     async tokenHierarchy( first_token, latest_token, history ){ 
@@ -100,23 +63,29 @@ class Scraper {
      * @param {*} token0 address
      * @param {*} token1 address
      */
-    async updatePairPriceWithReserves( 
-        txSender, router, txHash,
-        token0, token1, tokenOriginalOrder, amountIn,
-        pairAddress ){
+    async updatePairPriceWithReserves( router, pairAddress ){
 
         let pair_contract = pairAddress.toLowerCase();
+        console.log('[ANALIZE PAIR] ', pairAddress)
+        while( !this.CHAIN_MAIN_TOKEN_PRICE ) {
+            await sleep(100);
+        }
+
+        
     
         let first_pair =  await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].PAIR.PANCAKE, pair_contract );
         let first_reserves;
+        let token0;
+        let token1;
         try {
             first_reserves = await first_pair.methods.getReserves().call();
+            token0 = await first_pair.methods.token0().call();
+            token1 = await first_pair.methods.token1().call();
         } catch (error) {
             return console.log( '[ERROR] CANNOT RETRIVE RESERVES', error );
         }
 
         let tokenHistory = await this.tokenHistories.getTokenHistory( pair_contract.toLowerCase() );
-
         if(! this.bulk.bulk_normal.getHistory( pair_contract, EnumBulkTypes.TOKEN_HISTORY ) ) 
             this.bulk.bulk_normal.intializeBulkForContract( pair_contract, EnumBulkTypes.TOKEN_HISTORY );
         
@@ -140,32 +109,6 @@ class Scraper {
             }
         } 
     
-        if( !tokenHistory ){
-            tokenHistory = {
-                records_transactions: 0,
-                records_price: 0,
-                chain: EnumChainId.BSC,
-                token0: {
-                    contract: token0Infos.contract,
-                    name: token0Infos.name,
-                    symbol: token0Infos.symbol
-                },
-                token1: {
-                    contract: token1Infos.contract,
-                    name: token1Infos.name,
-                    symbol: token1Infos.symbol
-                },
-                router: router,
-                pair: pair_contract.toLowerCase(),
-                mainToken: mainToken.contract,
-                dependantToken: dependantToken.contract
-            };
-            
-            console.log(`[BULK ADD CREATE] ${Object.keys(this.bulk.bulk_normal.getHistories(EnumBulkTypes.TOKEN_HISTORY)).length} ${dependantToken.contract}`);
-            this.bulk.bulk_normal.setNewDocument( pair_contract.toLowerCase(), EnumBulkTypes.TOKEN_HISTORY, tokenHistory );
-            this.cache.setHistory(pair_contract.toLowerCase(), tokenHistory);
-        }
-    
         console.log(`[INFO] MAIN: ${mainToken.contract} | DEPENDANT: ${dependantToken.contract}`); 
         console.log(`[INFO] DEPENDANT PRICE: ${dependantTokenPrice}$`);
         
@@ -181,7 +124,18 @@ class Scraper {
         );
 
         // update the pair records
+        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,`mainToken`, mainToken.contract.toLowerCase() );
+        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,`dependantToken`, dependantToken.contract.toLowerCase() );
         this.bulk.bulk_normal.setTokenBulkInc( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,`records_transactions`, 1 );
+
+        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'token0.contract', token0Infos.contract.toLowerCase());
+        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'token0.name', token0Infos.name);
+        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'token0.symbol', token0Infos.symbol);
+
+        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'token1.contract', token1Infos.contract.toLowerCase());
+        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'token1.name', token1Infos.name);
+        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'token1.symbol', token1Infos.symbol);
+
         this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'reserve0', reserve0);
         this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'reserve1', reserve1);
         this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'price', dependantTokenPrice);
@@ -208,76 +162,6 @@ class Scraper {
             this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY, 'variation.day', dailyVariation );
             console.log(`[UPDATING PERCENTAGE DAILY] ${pair_contract} ${dailyVariation}`)
         }
-
-        /**
-         * - TODO
-         * Currently the price in usd relative to the amount of mainTokens transferred during the swap is not directly calculated
-         * except if the main token is BNB.
-         * 
-         * Assuming that most of the swap are made through bnb or stable coins
-         * then the script calculates for the following swap transactions this usd volumes
-         * 
-         * - 2BNB -> 100TOKEN : usd value of 2 * BNB_PRICE_IN_USD [ correct approach ]
-         * 
-         * - 10USDT -> 100TOKEN : usd value of 10 * 1. [ mostly correct approach ]
-         * - it do not really uses the USDT value to calculate the volumne, but just use the amount of USDT transferred 
-         * - to infer the value since USDT is pegged to USD. 
-         * 
-         * this approach can me mostly correct with BNB and stable coins with high market cap
-         * but if we have as mainToken some other random tokens we will have the following behaviour
-         * 
-         * 100 DOGE -> 100 TOKEN: value of 100 * 1 [ wrong approach ]
-         * so the transaction usd volume will result as 100 usd, instead it should be 100 * DOGE_PRICE_IN_USD
-         * 
-         * The main problem is that retriveing the price of each mainToken that is not bnb or a stable coin is highly expensive becouse
-         * we have to make many read operations to the database, and if we manage 500-1500 transaction per seconds or more it will result in
-         * a big LAG of all the apllications running on our system.
-         * 
-         * Something like the currently used cache system should be implemented, but the price of this tokens can vary from moment to moment,
-         * so each time that the price of this tokens changes we should update the cache as well.
-         * 
-        */
-
-        // update transactions object
-        let type; // track if transaction is buy or sell
-        let transferredTokensValue; // track the amount of mainToken used in ths transactions
-        let transferredTokensAmount;
-        let mainTokenPrice = 1; // if set to 1 it will have no impact on the multiplications below, it will be always be 1 except when the main token is BNB
-        if( mainTokenIsBNB ) mainTokenPrice = this.CHAIN_MAIN_TOKEN_PRICE[0];
-
-        let amountOut; 
-        let amountOutWithDecimals;
-        if( mainToken.contract == tokenOriginalOrder[0] ){
-            amountOut = ( dependantReserve/mainReserve ) * (amountIn/10**mainToken.decimals) ;
-            amountOutWithDecimals = amountOut * ( 10 ** dependantToken.decimals );
-            transferredTokensValue = (amountIn/10**mainToken.decimals) * mainTokenPrice;
-            transferredTokensAmount = amountOut;
-            type = 0;
-        } else {
-            amountOut = ( mainReserve/dependantReserve ) * (amountIn/10**dependantToken.decimals);
-            amountOutWithDecimals = amountOut * ( 10 ** mainToken.decimals );
-            transferredTokensValue = amountOut * mainTokenPrice;
-            transferredTokensAmount = (amountIn/10**dependantToken.decimals);
-            type = 1;
-        }
-
-        let time = Date.now()/1000;
-        console.log('[SETTING TRANSACTION] ', pair_contract, time)
-        this.bulk.bulk_time.setNewDocument( pair_contract, EnumBulkTypes.HISOTRY_TRANSACTION, time, {
-            time: time, // unix timestamp
-            type: type, // [ buy -> type = 1 ]. [ sell -> type = 0 ]
-            hash: txHash,
-            from: txSender,
-            value: transferredTokensValue,
-            amount: transferredTokensAmount,
-            pair: pair_contract,
-            router: router,
-            dependantToken: dependantToken.contract,
-            mainToken: mainToken.contract
-        }, false, 0.0001, true);
-
-        return amountOutWithDecimals;
-
     }
 
     getTime() { return Math.floor((Date.now()/1000)/this.UPDATE_PRICE_INTERVAL) * this.UPDATE_PRICE_INTERVAL }
@@ -353,6 +237,24 @@ class Scraper {
         }
     }
     
+    async loopUpdateMainTokenPrice(){
+        let FACTORY = await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].FACTORIES.PANCAKE, EnumContracts[EnumChainId.BSC].FACTORIES.PANCAKE );
+        while( true ){
+            try {
+                let mainTokenPairAddress = await FACTORY.methods.getPair( EnumMainTokens[EnumChainId.BSC].WBNB.address, EnumMainTokens[EnumChainId.BSC].USDT.address ).call();
+                let mainTokenPair = await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].PAIR.PANCAKE, mainTokenPairAddress );
+                let reserves = await mainTokenPair.methods.getReserves().call();
+                let WBNB_RESERVE = reserves[1]/10**EnumMainTokens[EnumChainId.BSC].WBNB.decimals;
+                let USDT_RESERVE = reserves[0]/10**EnumMainTokens[EnumChainId.BSC].USDT.decimals;
+                let WBNB_PRICE = USDT_RESERVE/WBNB_RESERVE;
+                this.CHAIN_MAIN_TOKEN_PRICE = WBNB_PRICE;
+            } catch (error) {
+                console.log(`[ERR UPDATING MAIN PRICE] ${error}`);
+            }
+            await sleep(5);
+        }
+    }
+
 }
 
-module.exports = Scraper;
+module.exports = ScraperSpecific;

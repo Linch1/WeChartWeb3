@@ -32,6 +32,8 @@ var tokenHistorySchema = mongoose.Schema({
     reserve1: Number,
     mainReserveValue: Number,
 
+    volume: Number,
+
     variation: {
         hour: Number,
         day: Number,

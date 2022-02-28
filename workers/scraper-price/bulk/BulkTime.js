@@ -185,9 +185,9 @@ class BulkTime {
             
         }
 
-        console.log( type, "toExecuteInsert: ", JSON.stringify(toExecuteInsert));
-        console.log( type, "\n\ntoExecutePush: ", JSON.stringify(toExecutePush));
-        console.log( type, "\n\ntoExecuteSet: ", JSON.stringify(toExecuteSet));
+        //console.log( type, "toExecuteInsert: ", JSON.stringify(toExecuteInsert));
+        //console.log( type, "\n\ntoExecutePush: ", JSON.stringify(toExecutePush));
+        //console.log( type, "\n\ntoExecuteSet: ", JSON.stringify(toExecuteSet));
        
         await model.insertMany(toExecuteInsert);
         console.log("EXECUTED INSERT");

@@ -5,7 +5,7 @@ class TokenHistory {
         this.cache = cache;
     }
     async getTokenHistory( pair ){
-        let tokenHistory = this.cache.getTokenHistory( pair );
+        let tokenHistory = this.cache.getTokenHistory( new RegExp(`/${pair}/i`) );
         if(!tokenHistory){
 
             tokenHistory = await TokenHistoryModel

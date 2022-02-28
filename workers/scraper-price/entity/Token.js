@@ -37,7 +37,7 @@ class Token {
                     symbol = await token_contract.methods.symbol().call();
 
                     tokenInfo = {
-                        contract: token,
+                        contract: token.toLowerCase(),
                         pairs_count: 0,
                         decimals: token_decimals,
                         name: name,
