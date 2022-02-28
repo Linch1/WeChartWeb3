@@ -4,7 +4,6 @@ const EnumContracts = require("../../enum/contracts");
 const Bulk = require("./bulk/Bulk");
 const Cache = require("./Cache");
 const Token = require("./entity/Token");
-const Pair = require('./Pair');
 
 
 const EnumAbi = require("../../enum/abi");
@@ -27,22 +26,8 @@ class Scraper {
         this.UPDATE_PRICE_INTERVAL = process.env.WRITE_TO_DB_SECONDS ; // create a new record for the prices every x seconds
         this.CHAIN_MAIN_TOKEN_PRICE = CHAIN_MAIN_TOKEN_PRICE;
 
-        this.METHODS = [ // methods used for swap the tokens
-            "swapETHForExactTokens",
-            "swapExactETHForTokens",
-            "swapExactETHForTokensSupportingFeeOnTransferTokens",
-            "swapExactTokensForETH",
-            "swapExactTokensForETHSupportingFeeOnTransferTokens",
-            "swapExactTokensForTokens",
-            "swapExactTokensForTokensSupportingFeeOnTransferTokens",
-            "swapTokensForExactETH",
-            "swapTokensForExactTokens"
-        ];
-
         this.ROUTERS = []; // the routers allowed
         for( let router of Object.values(EnumContracts[EnumChainId.BSC].ROUTERS) ) this.ROUTERS.push(router.toLowerCase() );
-
-        this.pairs = new Pair( this.web3 );
         
         this.cache = new Cache();
         this.bulk = new Bulk( this.cache );
@@ -52,22 +37,21 @@ class Scraper {
         this.historyPrices = new HistoryPirce( this.cache );
     }
 
-    async calculatePriceFromReserves( tx ) {
+    async calculatePriceFromReserves( txLogs, pairAddress ) {
 
-        if(!tx.to)return;
-        tx.to = tx.to.toLowerCase();
+        let hash = txLogs.transactionHash.toLowerCase();
+        let tx = await this.web3.eth.getTransaction(hash);
+        let sender = tx.from.toLowerCase();
+        let reciver = tx.to.toLowerCase();
         
-        // if the transaction didn't interacted with an untracked router then return
-        if( !this.ROUTERS.includes( tx.to.toLowerCase() ) ) return;
         
         // get the transaction reciept
         let tx_data = tx.data; // get the swap parameters
         if( !tx_data ) tx_data = tx.input; // the .data property sometime is in the .input field
         if( !tx_data ) { return; }
-    
+
         let decoded_data = abiDecoder.decodeMethod(tx_data); // decode the parameters of the transaction
         if( !decoded_data ) return; // return if wasn't able to decode the datas of the transaction
-        if( !this.METHODS.includes(decoded_data.name) ) return; // return if is not a tracked method
         
         let amountIn;
         let params = decoded_data.params; // decoded parameters
@@ -76,23 +60,23 @@ class Scraper {
             if( params[i].name == 'path' ) path = params[i].value;
             if(  params[i].name == 'amountIn' ||  params[i].name == 'amountInMax' ) amountIn = params[i].value; // get the amounts of token used as input
         }
-    
         if( !path[0] ) return; // return if the path has no values
         if( path[0].toLowerCase() == EnumMainTokens [EnumChainId.BSC].MAIN )  {
             if( !amountIn ) amountIn = tx.value;
         }
-        
-        // for each pair of path than update the pairs values
-        for( let i = 0; i <= path.length - 2; i ++ ){
-            let [ firstToken0Add, firstToken1Add ] = path[i] < path[i+1] ? [path[i], path[i+1]] : [path[i+1], path[i]]; // get the sold token
-            // update the amountIn with the returned value
-            amountIn = await this.updatePairPriceWithReserves(
-                tx, tx.to, 
-                firstToken0Add.toLowerCase(), firstToken1Add.toLowerCase(), 
-                [ path[i], path[i+1] ],
-                amountIn
-            );
-        }    
+
+        let [ firstToken0Add, firstToken1Add ] = path[0] < path[1] ? [path[0], path[1]] : [path[1], path[0]];
+
+        amountIn = await this.updatePairPriceWithReserves(
+            sender,
+            reciver,
+            hash,
+            firstToken0Add.toLowerCase(), firstToken1Add.toLowerCase(), 
+            [ path[0], path[1] ],
+            amountIn,
+            pairAddress
+        );
+
     }
 
     // returns an array [ mainToken, dependantToken ];
@@ -116,9 +100,12 @@ class Scraper {
      * @param {*} token0 address
      * @param {*} token1 address
      */
-    async updatePairPriceWithReserves( tx, router, token0, token1, tokenOriginalOrder, amountIn ){
+    async updatePairPriceWithReserves( 
+        txSender, router, txHash,
+        token0, token1, tokenOriginalOrder, amountIn,
+        pairAddress ){
 
-        let pair_contract = this.pairs.getPair(router, token0, token1);
+        let pair_contract = pairAddress;
     
         let first_pair =  await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].PAIR.PANCAKE, pair_contract );
         let first_reserves;
@@ -278,8 +265,8 @@ class Scraper {
         this.bulk.bulk_time.setNewDocument( pair_contract, EnumBulkTypes.HISOTRY_TRANSACTION, time, {
             time: time, // unix timestamp
             type: type, // [ buy -> type = 1 ]. [ sell -> type = 0 ]
-            hash: tx.hash,
-            from: tx.from,
+            hash: txHash,
+            from: txSender,
             value: transferredTokensValue,
             amount: transferredTokensAmount,
             pair: pair_contract,
