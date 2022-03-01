@@ -68,7 +68,7 @@ function TokensWss() {
     // setup authentication
     authHandler(ctx, () => {
       let { token } = getParams(request);
-      token = token.toLowerCase();
+      token = token;
       if( !clients[token] ) clients[token] = [];
       clients[token].push(ctx);
       tokens[ctx.id] = [token, clients[token].length - 1];

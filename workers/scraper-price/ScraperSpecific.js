@@ -30,7 +30,7 @@ class ScraperSpecific {
         this.CHAIN_MAIN_TOKEN_PRICE = 0;
 
         this.ROUTERS = []; // the routers allowed
-        for( let router of Object.values(EnumContracts[EnumChainId.BSC].ROUTERS) ) this.ROUTERS.push(router.toLowerCase() );
+        for( let router of Object.values(EnumContracts[EnumChainId.BSC].ROUTERS) ) this.ROUTERS.push(router );
         
         this.cache = new Cache();
         this.bulk = new Bulk( this.cache );
@@ -65,13 +65,11 @@ class ScraperSpecific {
      */
     async updatePairPriceWithReserves( router, pairAddress ){
 
-        let pair_contract = pairAddress.toLowerCase();
+        let pair_contract = pairAddress;
         console.log('[ANALIZE PAIR] ', pairAddress)
         while( !this.CHAIN_MAIN_TOKEN_PRICE ) {
             await sleep(100);
         }
-
-        
     
         let first_pair =  await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].PAIR.PANCAKE, pair_contract );
         let first_reserves;
@@ -85,7 +83,7 @@ class ScraperSpecific {
             return console.log( '[ERROR] CANNOT RETRIVE RESERVES', error );
         }
 
-        let tokenHistory = await this.tokenHistories.getTokenHistory( pair_contract.toLowerCase() );
+        let tokenHistory = await this.tokenHistories.getTokenHistory( pair_contract );
         if(! this.bulk.bulk_normal.getHistory( pair_contract, EnumBulkTypes.TOKEN_HISTORY ) ) 
             this.bulk.bulk_normal.intializeBulkForContract( pair_contract, EnumBulkTypes.TOKEN_HISTORY );
         
@@ -103,9 +101,9 @@ class ScraperSpecific {
         
     
         if( mainTokenIsBNB ){ // if the main token was BNB then multiply for get the token usd value
-            console.log('[MAIN PRICE]', this.CHAIN_MAIN_TOKEN_PRICE[0])
-            if(this.CHAIN_MAIN_TOKEN_PRICE[0]){
-                dependantTokenPrice = dependantTokenPrice * this.CHAIN_MAIN_TOKEN_PRICE[0];
+            console.log('[MAIN PRICE]', this.CHAIN_MAIN_TOKEN_PRICE)
+            if(this.CHAIN_MAIN_TOKEN_PRICE){
+                dependantTokenPrice = dependantTokenPrice * this.CHAIN_MAIN_TOKEN_PRICE;
             }
         } 
     
@@ -124,21 +122,25 @@ class ScraperSpecific {
         );
 
         // update the pair records
-        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,`mainToken`, mainToken.contract.toLowerCase() );
-        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,`dependantToken`, dependantToken.contract.toLowerCase() );
+        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,`pair`, pair_contract );
+        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,`mainToken`, mainToken.contract );
+        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,`dependantToken`, dependantToken.contract );
         this.bulk.bulk_normal.setTokenBulkInc( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,`records_transactions`, 1 );
 
-        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'token0.contract', token0Infos.contract.toLowerCase());
+        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'token0.contract', token0Infos.contract);
         this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'token0.name', token0Infos.name);
         this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'token0.symbol', token0Infos.symbol);
 
-        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'token1.contract', token1Infos.contract.toLowerCase());
+        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'token1.contract', token1Infos.contract);
         this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'token1.name', token1Infos.name);
         this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'token1.symbol', token1Infos.symbol);
 
         this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'reserve0', reserve0);
         this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'reserve1', reserve1);
         this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'price', dependantTokenPrice);
+
+        console.log(this.bulk.bulk_normal.BulkWriteOperations[EnumBulkTypes.TOKEN_HISTORY][pair_contract],  )
+        console.log( this.bulk.bulk_normal.BulkWriteOperations[EnumBulkTypes.TOKEN_HISTORY][pair_contract]['update']['updateOne']['update']['$set'] )
 
         // detect the main reseve and the dependant token reserve in the pair
         let mainReserve;
@@ -152,7 +154,7 @@ class ScraperSpecific {
         }
 
         let mainReserveValue = mainReserve; 
-        if( mainTokenIsBNB ) mainReserveValue = mainReserve * this.CHAIN_MAIN_TOKEN_PRICE[0]; // if the main token of the pair is BNB then multiply the tokens in the pair reserver * bnb price
+        if( mainTokenIsBNB ) mainReserveValue = mainReserve * this.CHAIN_MAIN_TOKEN_PRICE; // if the main token of the pair is BNB then multiply the tokens in the pair reserver * bnb price
         this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY, 'mainReserveValue', mainReserveValue);
 
         // update daily variation percentage

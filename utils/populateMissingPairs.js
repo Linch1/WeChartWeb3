@@ -138,7 +138,7 @@ async function scrape_pair( child_id, factory, current_index){
         let token_0_address = await pair_contract.methods.token0().call();
         let mongo_token_0 = await TokenBasic.findOne({ contract: token_0_address})
         if( !mongo_token_0 ){
-            let token_0 = await getTokenInformations( token_0_address.toLowerCase(), EnumChainId.BSC );
+            let token_0 = await getTokenInformations( token_0_address, EnumChainId.BSC );
             mongo_token_0 = new TokenBasic(token_0);
             await mongo_token_0.save();
         } else {
@@ -148,7 +148,7 @@ async function scrape_pair( child_id, factory, current_index){
         let token_1_address = await pair_contract.methods.token1().call();
         let mongo_token_1 = await TokenBasic.findOne({ contract: token_1_address});
         if( !mongo_token_1 ){
-            let token_1 = await getTokenInformations( token_1_address.toLowerCase(), EnumChainId.BSC );
+            let token_1 = await getTokenInformations( token_1_address, EnumChainId.BSC );
             mongo_token_1 = new TokenBasic(token_1);
             await mongo_token_1.save();
         } else {
@@ -160,9 +160,9 @@ async function scrape_pair( child_id, factory, current_index){
         if( !mongo_pair ){
             console.log(`NEW PAIR CONTRACT: ${current_index} ${pair_address} `);
             let pair = {
-                token0: { contract: token_0_address.toLowerCase(), token: mongo_token_0._id },
-                token1: { contract: token_1_address.toLowerCase(), token: mongo_token_1._id },
-                contract: pair_address.toLowerCase(),
+                token0: { contract: token_0_address, token: mongo_token_0._id },
+                token1: { contract: token_1_address, token: mongo_token_1._id },
+                contract: pair_address,
                 index: current_index
             };
             mongo_pair = new Pair(pair);

@@ -12,7 +12,7 @@ mongoose.connect(configDB.url, {
   useNewUrlParser: true,
   useFindAndModify: false,
   useUnifiedTopology: true
-}).then(() => { console.log('MongoDB is connected') })
+}).then(() => { console.log('6MongoDB is connected') })
 .catch(err => {
   console.log('MongoDB connection unsuccessful');
   console.log(err)
@@ -33,7 +33,7 @@ let indexes = [];
     for( let i = 0;  i < tokens.length; i++ ){  
         if( i % 1000 == 0 ) console.log( i );
         let token = tokens[i];
-        await TokenBasic.findOneAndUpdate( { contract: token.contract }, { $set: { contract: token.contract.toLowerCase() }} );
+        await TokenBasic.findOneAndUpdate( { contract: token.contract }, { $set: { contract: token.contract }} );
     }
     console.log('done')
 

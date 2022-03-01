@@ -6,12 +6,12 @@ var ServiceHistory = require('./db.history');
 let TOKENS_PER_PAGE = 25;
 
 async function findByContract( contract ){
-    let tokenInfos = await TokenBasic.findOne({ contract: contract.toLowerCase() }).lean().exec();
+    let tokenInfos = await TokenBasic.findOne({ contract: contract }).lean().exec();
     if( !tokenInfos || tokenInfos.name == "$NULL" ) { return null }
     return tokenInfos;
 }
 async function getSymbolFromContract( contract ){
-    let tokenInfos = await TokenBasic.findOne({ contract: contract.toLowerCase() }).select({ symbol: 1 }).lean().exec();
+    let tokenInfos = await TokenBasic.findOne({ contract: contract }).select({ symbol: 1 }).lean().exec();
     if( !tokenInfos || tokenInfos.name == "$NULL" ) { return null }
     return tokenInfos.symbol;
 }
@@ -20,7 +20,7 @@ async function searchByUrlOrContract( urlOrContract ){
     let tokens = await TokenBasic.find({ 
         $or: [
             {name: { $regex: '.*' + query + '.*', $options: 'i' }}, 
-            {contract: urlOrContract.toLowerCase() }
+            {contract: urlOrContract }
         ] 
     })
     .select({ name: 1, symbol: 1, contract: 1, pairs_count: 1 })
@@ -32,7 +32,7 @@ async function searchByUrlOrContract( urlOrContract ){
 }
 
 async function getPairs( contract ){
-    let tokenPairs = await ServiceHistory.findPairs( contract.toLowerCase() );
+    let tokenPairs = await ServiceHistory.findPairs( contract );
     let pairs = {} // tokenAddress => { reserve: num, name: name }
     for( let i in tokenPairs ){
         let pairInfos = tokenPairs[i];
@@ -65,7 +65,7 @@ async function getPairs( contract ){
 }
 async function getPairsMultiple( contracts ){
     for( let i in contracts ){
-        contracts[i] = contracts[i].toLowerCase();
+        contracts[i] = contracts[i];
     }
 
     let tokensPairs = await ServiceHistory.findPairsMultiple( contracts );
@@ -109,7 +109,7 @@ async function getPairsMultiple( contracts ){
 }
 
 async function getSupplyMultiple( contracts ){
-    for( let i in contracts ) contracts[i] = contracts[i].toLowerCase();
+    for( let i in contracts ) contracts[i] = contracts[i];
     
     let retrivedSupplies = await findSupplyMultiple( contracts );
     let retrived = {};
@@ -131,7 +131,7 @@ async function findSupplyMultiple( contracts ){
 
 async function getMainPair( contract ){
 
-    let pairs = await getPairs( contract.toLowerCase() ) // tokenAddress => pair informations
+    let pairs = await getPairs( contract ) // tokenAddress => pair informations
 
     let token = await TokenBasic.findOne({contract : contract}).select({total_supply: 1}).lean().exec();
     let totalSupply = token ? token.total_supply : 0;
@@ -190,7 +190,7 @@ async function getMainPair( contract ){
 async function getMainPairMultiple( contracts ){
 
     for( let i in contracts ){
-        contracts[i] = contracts[i].toLowerCase();
+        contracts[i] = contracts[i];
     }
 
     let tokensPairs = await getPairsMultiple( contracts ) // tokenAddress => { pair address: pair informations }

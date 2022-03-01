@@ -8,15 +8,14 @@ mongoose.connect(configDB.url, {
   autoIndex: false,
   useNewUrlParser: true,
   useUnifiedTopology: true
-}).then(() => { console.log('MongoDB is connected') })
+}).then(() => { console.log('9MongoDB is connected') })
 .catch(err => {
   console.log('MongoDB connection unsuccessful');
   console.log(err)
 });
 
 
-(async () => {
-
+async function removeDuplicatesTokens(){
     var duplicates = [];
 
     let tokensCount = await TokenBasic.countDocuments();
@@ -53,8 +52,11 @@ mongoose.connect(configDB.url, {
 
     // If you want to Check all "_id" which you are deleting else print statement not needed
     console.log('All tokens: ', tokensCount);
-    console.log( 'All duplicates: ', duplicates.length );
-    // let res = await TokenBasic.deleteMany({_id:{$in:duplicates}})  
-    // console.log('Deleted: ', res)
-})();
+    console.log('All duplicates: ', duplicates.length );
+    let res = await TokenBasic.deleteMany({_id:{$in:duplicates}})  
+    console.log('Deleted Tokens: ', res)
+}
 
+module.exports = {
+    removeDuplicatesTokens
+}

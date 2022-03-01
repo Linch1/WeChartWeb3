@@ -8,15 +8,14 @@ mongoose.connect(configDB.url, {
   autoIndex: false,
   useNewUrlParser: true,
   useUnifiedTopology: true
-}).then(() => { console.log('MongoDB is connected') })
+}).then(() => { console.log('8MongoDB is connected') })
 .catch(err => {
   console.log('MongoDB connection unsuccessful');
   console.log(err)
 });
 
 
-(async () => {
-
+async function removeDuplicatesHistories(){
     var duplicates = [];
 
     let tokens = await TokenHistory.aggregate([
@@ -39,11 +38,22 @@ mongoose.connect(configDB.url, {
         let tokenDocs = token.docs;
         let maxPairs = 0;
         let index = 0;
-        tokenDocs.sort((a, b) => parseFloat(b.records_price) - parseFloat(a.records_price));
-        console.log( tokenDocs )
-        for( let i = 1; i < tokenDocs.length; i ++){
-            duplicates.push(tokenDocs[i]._id);
-            
+
+        let doc1 = tokenDocs[0];
+        let doc2 = tokenDocs[1];
+
+        if( doc1.records_price == doc2.records_price ){
+            if( doc1.pair != doc1.pair ) {
+                duplicates.push(doc1._id);
+            } else {
+                duplicates.push(doc2._id);
+            }
+        } else {
+            if( doc1.records_price > doc2.records_price ){
+                duplicates.push(doc2._id);
+            } else {
+                duplicates.push(doc1._id);
+            }
         }
         // console.log('MAX PAIRS: ', maxPairs, ' SPLICED: ', record )
     })
@@ -52,6 +62,11 @@ mongoose.connect(configDB.url, {
     //console.log('All tokens: ', tokensCount);
     console.log( 'All duplicates: ', duplicates.length );
     let res = await TokenHistory.deleteMany({_id:{$in:duplicates}})  
-    console.log('Deleted: ', res)
-})();
+    console.log('Deleted Histories: ', res)
+}
 
+module.exports = {
+    removeDuplicatesHistories
+}
+
+removeDuplicatesHistories();

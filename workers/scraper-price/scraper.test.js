@@ -16,15 +16,15 @@
 
 require('dotenv').config();
 
-const EnumChainId = require('../enum/chain.id');
-const EnumAbi = require('../enum/abi');
-const EnumContracts = require('../enum/contracts');
-const EnumMainTokens = require('../enum/mainTokens');
+const EnumChainId = require('../../enum/chain.id');
+const EnumAbi = require('../../enum/abi');
+const EnumContracts = require('../../enum/contracts');
+const EnumMainTokens = require('../../enum/mainTokens');
 
 // initialize mongodb
 let TOTAL_TX = 0;
 
-var configDB = require('../server/config/database');
+var configDB = require('../../server/config/database');
 const mongoose = require('mongoose');
 
 let Web3 = require('web3');
@@ -32,7 +32,7 @@ let web3 = new Web3(process.env.PROVIDER_WSS); // Initialize Ethereum Web3 clien
 
 let MAIN_TOKEN_PRICE = [0];
 
-const Scraper = require('./scraper-price/Scraper');
+const Scraper = require('./Scraper');
 const scraper = new Scraper( web3, MAIN_TOKEN_PRICE );
 const UPDATE_DATABASE_INTERVAL = 5000; // 5seconds in milliseconds
 const UPDATE_MAIN_TOKEN_INTERVAL = 5000; // 5seconds in milliseconds
@@ -112,44 +112,8 @@ async function scanTransactionCallback(txn, pairAddress) {
     })
     .catch(err => { console.log('MongoDB connection unsuccessful', err) });
 
-    // Listen for all the swap events on the blockchain
-    let filter = [ '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822'/*swap*/ ];
-    var subscription = web3.eth.subscribe('logs', {
-        topics: filter
-    }, async function(error, tx){
-        
-        if( error )
-            return console.log( error );
+    scanTransactionCallback({
+        transactionHash: '0xcca50546c74e4ada10578ced6f6857bbb1676bab2f0ee05ad26014391e6c0d77'
+    }, '0x703f1C0B4399A51704e798002281bf26D6f9c2E6') // for each swap scan the tranasction
 
-        let pair = tx.address;
-        await sleep(10); // do not remove otherwise duplicate will appear in the db
-        scanTransactionCallback(tx, pair) // for each swap scan the tranasction
-
-    })
-
-    // unsubscribes the subscription
-    subscription.unsubscribe(function(error, success){
-        if(success)
-            console.log('Successfully unsubscribed!');
-    });
-
-
-    /**
-     * @description Executes the stored queries inside BulkWriteOperations object of the scraper.
-     * The queries are stored inside this object instead of directly executed to reduce the write operations on the database
-     * and to take advandage of the bulk operations by aggregating all the stored queries
-     * @returns 
-     */
-    function getWriteTime( timeMs ) { return Math.floor( (timeMs/1000) / process.env.WRITE_TO_DB_SECONDS) * process.env.WRITE_TO_DB_SECONDS; }
-    async function loopUpdateOnDb(){
-        while(true){
-            let now = getWriteTime(Date.now());
-            await sleep(1000);
-            // push the updates every minute change to optimize the writes on the database
-            if( now != getWriteTime( Date.now() + 1000 ) )  await scraper.bulk.execute();
-            // await sleep(5000);
-            // await scraper.bulk.execute();
-        }
-    }
-    
 })();

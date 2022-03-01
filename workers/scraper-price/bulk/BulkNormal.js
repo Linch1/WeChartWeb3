@@ -4,6 +4,8 @@ const TokenHistory = require('../../../server/models/token_history');
 const HistoryPrice = require('../../../server/models/history_prices');
 const HistoryTransaction = require('../../../server/models/history_transactions');
 const EnumBulkTypes = require('../../../enum/bulk.records.type');
+const { removeDuplicatesTokens } = require('../../../utils/removeDuplicateTokens');
+const { removeDuplicatesHistories } = require('../../../utils/removeDuplicateHistories');
 
 let modelsMapping = {
     [EnumBulkTypes.TOKEN_HISTORY]: TokenHistory,
@@ -200,7 +202,13 @@ class BulkNormal {
         console.log("EXECUTED PUSH");
         await model.bulkWrite(toExecuteSet);
         console.log("EXECUTED SET");
+
+        await removeDuplicatesTokens();
+        await removeDuplicatesHistories();
+        
         return tokenContracts;
+
+        
     }
 }
 

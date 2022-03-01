@@ -19,7 +19,7 @@ mongoose.connect(configDB.url, {
   autoIndex: false,
   useNewUrlParser: true,
   useUnifiedTopology: true
-}).then(() => { console.log('MongoDB is connected') })
+}).then(() => { console.log('1MongoDB is connected') })
 .catch(err => {
   console.log('MongoDB connection unsuccessful');
   console.log(err)

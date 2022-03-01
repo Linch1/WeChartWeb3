@@ -6,7 +6,7 @@ async function findTransactions( pair, page ){
     if(!page) page = 1;
 
     let documents = await HistoryTransactions.find(
-        { pair: pair.toLowerCase() }
+        { pair: pair }
     )
     .sort({ time: -1 }).limit(page * TRANSACTIONS_PER_PAGE_LIMIT).lean().exec();
     return documents;

@@ -27,7 +27,7 @@ class Scraper {
         this.CHAIN_MAIN_TOKEN_PRICE = CHAIN_MAIN_TOKEN_PRICE;
 
         this.ROUTERS = []; // the routers allowed
-        for( let router of Object.values(EnumContracts[EnumChainId.BSC].ROUTERS) ) this.ROUTERS.push(router.toLowerCase() );
+        for( let router of Object.values(EnumContracts[EnumChainId.BSC].ROUTERS) ) this.ROUTERS.push(router );
         
         this.cache = new Cache();
         this.bulk = new Bulk( this.cache );
@@ -39,42 +39,18 @@ class Scraper {
 
     async calculatePriceFromReserves( txLogs, pairAddress ) {
 
-        let hash = txLogs.transactionHash.toLowerCase();
+        let hash = txLogs.transactionHash;
         let tx = await this.web3.eth.getTransaction(hash);
-        let sender = tx.from.toLowerCase();
-        let reciver = tx.to.toLowerCase();
-        
-        
-        // get the transaction reciept
-        let tx_data = tx.data; // get the swap parameters
-        if( !tx_data ) tx_data = tx.input; // the .data property sometime is in the .input field
-        if( !tx_data ) { return; }
+        let sender = tx.from;
+        let reciver = tx.to;
 
-        let decoded_data = abiDecoder.decodeMethod(tx_data); // decode the parameters of the transaction
-        if( !decoded_data ) return; // return if wasn't able to decode the datas of the transaction
-        
-        let amountIn;
-        let params = decoded_data.params; // decoded parameters
-        let path = [];
-        for(let i in params){  // loop to print parameters without unnecessary info
-            if( params[i].name == 'path' ) path = params[i].value;
-            if(  params[i].name == 'amountIn' ||  params[i].name == 'amountInMax' ) amountIn = params[i].value; // get the amounts of token used as input
-        }
-        if( !path[0] ) return; // return if the path has no values
-        if( path[0].toLowerCase() == EnumMainTokens [EnumChainId.BSC].MAIN )  {
-            if( !amountIn ) amountIn = tx.value;
-        }
-
-        let [ firstToken0Add, firstToken1Add ] = path[0] < path[1] ? [path[0], path[1]] : [path[1], path[0]];
-
-        amountIn = await this.updatePairPriceWithReserves(
+        console.log(`[SCRAPING] ${pairAddress} | ${hash} `)
+        await this.updatePairPriceWithReserves(
             sender,
             reciver,
             hash,
-            firstToken0Add.toLowerCase(), firstToken1Add.toLowerCase(), 
-            [ path[0].toLowerCase(), path[1].toLowerCase() ],
-            amountIn,
-            pairAddress
+            pairAddress,
+            //amountIn
         );
 
     }
@@ -88,7 +64,18 @@ class Scraper {
             else return [ latest_token, first_token ];
         }
        // compare wich of the tokens is used more frequently to create pairs. This means that the one with more pairs is the more common used
-       let pairs_comparison = first_token.pairs_count > latest_token.pairs_count; // here pairs_count
+
+       let pairs_comparison; // true if first token is the main one, else false
+       if( first_token.pairs_count == latest_token.pairs_count ){
+            if( EnumMainTokens[EnumChainId.BSC].STABLECOINS.includes(first_token.contract.toLowerCase()) ) pairs_comparison = true;
+            else if( EnumMainTokens[EnumChainId.BSC].STABLECOINS.includes(latest_token.contract.toLowerCase()) ) pairs_comparison = false;
+            else if ( EnumMainTokens[EnumChainId.BSC].WBNB == first_token.contract.toLowerCase() ) pairs_comparison = true;
+            else if ( EnumMainTokens[EnumChainId.BSC].WBNB == latest_token.contract.toLowerCase() ) pairs_comparison = false;
+
+       } else {
+            pairs_comparison = first_token.pairs_count > latest_token.pairs_count; // here pairs_count
+       }
+       
        let main_token = pairs_comparison ? first_token : latest_token;
        let dependant_token = pairs_comparison ? latest_token : first_token;
        return [ main_token, dependant_token ];
@@ -101,21 +88,24 @@ class Scraper {
      * @param {*} token1 address
      */
     async updatePairPriceWithReserves( 
-        txSender, router, txHash,
-        token0, token1, tokenOriginalOrder, amountIn,
-        pairAddress ){
+        txSender, router, txHash, pairAddress,
+        //amountIn
+    ){
 
-        let pair_contract = pairAddress.toLowerCase();
-    
-        let first_pair =  await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].PAIR.PANCAKE, pair_contract );
+        let pair_contract = pairAddress;
+        let pairWeb3Contract =  await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].PAIR.PANCAKE, pair_contract );
         let first_reserves;
+        let token0;
+        let token1;
         try {
-            first_reserves = await first_pair.methods.getReserves().call();
+            first_reserves = await pairWeb3Contract.methods.getReserves().call();
+            token0 = await pairWeb3Contract.methods.token0().call();
+            token1 = await pairWeb3Contract.methods.token1().call();
         } catch (error) {
             return console.log( '[ERROR] CANNOT RETRIVE RESERVES', error );
         }
 
-        let tokenHistory = await this.tokenHistories.getTokenHistory( pair_contract.toLowerCase() );
+        let tokenHistory = await this.tokenHistories.getTokenHistory( pair_contract );
 
         if(! this.bulk.bulk_normal.getHistory( pair_contract, EnumBulkTypes.TOKEN_HISTORY ) ) 
             this.bulk.bulk_normal.intializeBulkForContract( pair_contract, EnumBulkTypes.TOKEN_HISTORY );
@@ -156,18 +146,19 @@ class Scraper {
                     symbol: token1Infos.symbol
                 },
                 router: router,
-                pair: pair_contract.toLowerCase(),
+                pair: pair_contract,
                 mainToken: mainToken.contract,
                 dependantToken: dependantToken.contract
             };
             
             console.log(`[BULK ADD CREATE] ${Object.keys(this.bulk.bulk_normal.getHistories(EnumBulkTypes.TOKEN_HISTORY)).length} ${dependantToken.contract}`);
-            this.bulk.bulk_normal.setNewDocument( pair_contract.toLowerCase(), EnumBulkTypes.TOKEN_HISTORY, tokenHistory );
-            this.cache.setHistory(pair_contract.toLowerCase(), tokenHistory);
+            this.bulk.bulk_normal.setNewDocument( pair_contract, EnumBulkTypes.TOKEN_HISTORY, tokenHistory );
+            this.cache.setHistory(pair_contract, tokenHistory);
         }
-    
-        console.log(`[INFO] MAIN: ${mainToken.contract} | DEPENDANT: ${dependantToken.contract}`); 
-        console.log(`[INFO] DEPENDANT PRICE: ${dependantTokenPrice}$`);
+        
+        
+        console.log(`[INFO] MAIN: ${mainToken.contract} | DEPENDANT: ${dependantToken.contract} | ${pairAddress}`); 
+        console.log(`[INFO] DEPENDANT PRICE: ${dependantTokenPrice}$ | ${pairAddress} `);
         
         let reserve0 = first_reserves[0]/10**token0Infos.decimals;
         let reserve1 = first_reserves[1]/10**token1Infos.decimals;
@@ -238,6 +229,7 @@ class Scraper {
          * 
         */
 
+        /*****
         // update transactions object
         let type; // track if transaction is buy or sell
         let transferredTokensValue; // track the amount of mainToken used in ths transactions
@@ -277,7 +269,7 @@ class Scraper {
         }, false, 0.0001, true);
 
         return amountOutWithDecimals;
-
+        *******/
     }
 
     getTime() { return Math.floor((Date.now()/1000)/this.UPDATE_PRICE_INTERVAL) * this.UPDATE_PRICE_INTERVAL }

@@ -8,7 +8,7 @@ mongoose.connect(configDB.url, {
   autoIndex: false,
   useNewUrlParser: true,
   useUnifiedTopology: true
-}).then(() => { console.log('MongoDB is connected') })
+}).then(() => { console.log('10MongoDB is connected') })
 .catch(err => {
   console.log('MongoDB connection unsuccessful');
   console.log(err)
@@ -16,7 +16,7 @@ mongoose.connect(configDB.url, {
 
 
 function hasUpperCase(str) {
-    return str.toLowerCase() != str;
+    return str != str;
 }
 
 (async () => {

@@ -12,7 +12,7 @@ mongoose.connect(configDB.url, {
   useNewUrlParser: true,
   useFindAndModify: false,
   useUnifiedTopology: true
-}).then(() => { console.log('MongoDB is connected') })
+}).then(() => { console.log('2MongoDB is connected') })
 .catch(err => {
   console.log('MongoDB connection unsuccessful');
   console.log(err)
