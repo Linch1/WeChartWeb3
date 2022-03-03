@@ -1,4 +1,8 @@
-
+require('dotenv').config();
+const ethers = require('ethers')
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 /**
  * 
  * 
@@ -13,61 +17,20 @@
  * 
 */
 
+// Initialize Ethereum Web3 client
+let Web3 = require('web3');
+let web3_wss = new Web3(process.env.PROVIDER_WSS); 
+let web3_https = new Web3(process.env.PROVIDER_HTTPS);
 
-require('dotenv').config();
-
-const EnumChainId = require('../enum/chain.id');
-const EnumAbi = require('../enum/abi');
-const EnumContracts = require('../enum/contracts');
-const EnumMainTokens = require('../enum/mainTokens');
-
-// initialize mongodb
-let TOTAL_TX = 0;
-
+//imports
 var configDB = require('../server/config/database');
 const mongoose = require('mongoose');
-
-let Web3 = require('web3');
-let web3 = new Web3(process.env.PROVIDER_WSS); // Initialize Ethereum Web3 client
-
-let MAIN_TOKEN_PRICE = [0];
-
 const Scraper = require('./scraper-price/Scraper');
-const scraper = new Scraper( web3, MAIN_TOKEN_PRICE );
-const UPDATE_DATABASE_INTERVAL = 5000; // 5seconds in milliseconds
-const UPDATE_MAIN_TOKEN_INTERVAL = 5000; // 5seconds in milliseconds
-
-let FACTORY;
+const Queue = require('./scraper-price/Queue');
+const scraper = new Scraper( web3_https );
 
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// END HANDLE TOKEN HISTORY CACHE
-async function updateMainTokenPrice(){
-    let mainTokenPairAddress = await FACTORY.methods.getPair( EnumMainTokens[EnumChainId.BSC].WBNB.address, EnumMainTokens[EnumChainId.BSC].USDT.address ).call();
-    let mainTokenPair = await new web3.eth.Contract( EnumAbi[EnumChainId.BSC].PAIR.PANCAKE, mainTokenPairAddress );
-    let reserves = await mainTokenPair.methods.getReserves().call();
-    let WBNB_RESERVE = reserves[1]/10**EnumMainTokens[EnumChainId.BSC].WBNB.decimals;
-    let USDT_RESERVE = reserves[0]/10**EnumMainTokens[EnumChainId.BSC].USDT.decimals;
-    let WBNB_PRICE = USDT_RESERVE/WBNB_RESERVE;
-    MAIN_TOKEN_PRICE[0] = WBNB_PRICE;
-}
-
-async function loopUpdateMainTokenPrice(){
-    while( true ){
-        try {
-            await updateMainTokenPrice();
-        } catch (error) {
-            console.log(`[ERR UPDATING MAIN PRICE] ${error}`);
-        }
-        await sleep(UPDATE_MAIN_TOKEN_INTERVAL);
-    }
-}
-
-
- /**
+/**
   * Scan an individual transaction
   *
   * This is called once for every transaction found between the
@@ -83,47 +46,64 @@ async function loopUpdateMainTokenPrice(){
   * @param {Object} txn (See https://github.com/ethereum/wiki/wiki/JavaScript-API#web3ethgettransaction)
   * @param {Object} block The parent block of the transaction (See https://github.com/ethereum/wiki/wiki/JavaScript-API#web3ethgetblock)
   */
-let SCANNED_TRANSACTIOSN = 0;
-async function scanTransactionCallback(txn, pairAddress) {
-    SCANNED_TRANSACTIOSN ++;
+ async function scanTransactionCallback(hash, router, sender, params, pair, cb) {
     //console.log( txn.to, txn.from )
-    TOTAL_TX ++;
     try {
-        await scraper.calculatePriceFromReserves(txn, pairAddress);
-        console.log('[TOTAL TX] ', TOTAL_TX)
+        await scraper.calculatePriceFromReserves(hash, router, sender, params, pair);
     } catch (error) {
         console.log("[ERR CALCULATING PRICE]", error)
     }
-    TOTAL_TX --;
+    cb();
 }
 
 
-
 ( async () => {
-    FACTORY = await new web3.eth.Contract( EnumAbi[EnumChainId.BSC].FACTORIES.PANCAKE, EnumContracts[EnumChainId.BSC].FACTORIES.PANCAKE );
-    
+
+    // let queue = new Queue(200, scanTransactionCallback);
+
+    let TotalTx = 0;
+
     mongoose.connect(configDB.url, {
         autoIndex: false,
         useNewUrlParser: true,
         useUnifiedTopology: true
     }).then(async () => { 
-        loopUpdateMainTokenPrice(); // starts the loop that updates the main token price every 5 seconds
         loopUpdateOnDb(); // starts the loop that updates the db every 5 seconds
     })
     .catch(err => { console.log('MongoDB connection unsuccessful', err) });
 
     // Listen for all the swap events on the blockchain
     let filter = [ '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822'/*swap*/ ];
-    var subscription = web3.eth.subscribe('logs', {
+    var subscription = web3_wss.eth.subscribe('logs', {
         topics: filter
     }, async function(error, tx){
         
-        if( error )
-            return console.log( error );
+        if( error ) return console.log( error );
 
+        let hash = tx.transactionHash;
+
+        let signature = "Swap(address,uint256,uint256,uint256,uint256,address)";
+        let signByte = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(signature));
+        
+        let router = '0x' + tx.topics[1].substr(26);
+        let sender = '0x' + tx.topics[2].substr(26);
+
+        let decodedParams = ethers.utils.defaultAbiCoder.decode(['uint256','uint256','uint256','uint256'], tx.data);
+        
+        let params = [];
+        for( let param of decodedParams ) params.push(param.toString());
+        
         let pair = tx.address;
-        await sleep(10); // do not remove otherwise duplicate will appear in the db
-        scanTransactionCallback(tx, pair) // for each swap scan the tranasction
+        
+        TotalTx ++;
+
+        scanTransactionCallback(hash, router, sender, params, pair, () => {
+            TotalTx --;
+            console.log('[TOTAL TX] ', TotalTx);
+        });
+
+        //console.log( tx )
+        //queue.add(hash, router, sender, params, pair);
 
     })
 

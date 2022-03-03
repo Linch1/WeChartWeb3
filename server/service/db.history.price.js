@@ -1,4 +1,5 @@
 const HistoryPrice = require('../models/history_prices');
+const UtilsAddresses = require('../../utils/addresses');
 
 async function findPrices( pair, from, to, recordsCount ){
 
@@ -6,7 +7,10 @@ async function findPrices( pair, from, to, recordsCount ){
     if( !pair || !from || !to ) return [];
 
     let records = await HistoryPrice.find(
-      { pair: pair, time: { $lt: parseInt(to) } }
+      { 
+        pair: UtilsAddresses.toCheckSum(pair), 
+        time: { $lt: parseInt(to) } 
+      }
     ).sort({time: -1}).lean().limit(recordsCount).select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).exec();
 
     return records;
@@ -15,7 +19,10 @@ async function findLastPrice( pair, from, to ){
     if( !pair || !from ) return null;
 
     let record = await HistoryPrice.findOne(
-        { pair: pair, time: { $lt: parseInt(from) } }
+        { 
+          pair: UtilsAddresses.toCheckSum(pair), 
+          time: { $lt: parseInt(from) } 
+        }
     ).lean().select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).sort({ time: -1 }).exec();
         
     return record;
@@ -24,7 +31,10 @@ async function findLastPrice( pair, from, to ){
 async function findPrice( pair ){
     if( !pair ) return null;
     let record = await HistoryPrice.findOne(
-        { pair: pair, time: { $lte: parseInt(Date.now()/1000) } }
+        { 
+          pair: UtilsAddresses.toCheckSum(pair), 
+          time: { $lte: parseInt(Date.now()/1000) } 
+        }
     ).lean().select({ value: 1 }).exec();
     if( !record ) { return null }
     return record.value;
@@ -32,7 +42,7 @@ async function findPrice( pair ){
 
 async function findPriceMultiple( pairs ){
     if( !pairs || !pairs.length ) return null;
-    for( let i in pairs ){ pairs[i] = pairs[i] }
+    for( let i in pairs ){ pairs[i] = UtilsAddresses.toCheckSum(pairs[i]) }
     
     let records = HistoryPrice.aggregate([
         {

@@ -15,6 +15,7 @@
   "dependencies": {
     "abi-decoder": "^2.4.0",
     "axios": "^0.26.0",
+    "big-number": "^2.0.0",
     "compression": "^1.7.4",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",

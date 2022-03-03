@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+const TokenBasic = require('../../../server/models/token_basic');
 const TokenHistory = require('../../../server/models/token_history');
 const HistoryPrice = require('../../../server/models/history_prices');
 const HistoryTransaction = require('../../../server/models/history_transactions');
@@ -10,7 +11,8 @@ const { removeDuplicatesHistories } = require('../../../utils/removeDuplicateHis
 let modelsMapping = {
     [EnumBulkTypes.TOKEN_HISTORY]: TokenHistory,
     [EnumBulkTypes.HISTORY_PRICE]: HistoryPrice,
-    [EnumBulkTypes.HISOTRY_TRANSACTION]: HistoryTransaction
+    [EnumBulkTypes.HISOTRY_TRANSACTION]: HistoryTransaction,
+    [EnumBulkTypes.TOKEN_BASIC]: TokenBasic
 }
 
 class BulkNormal {
@@ -42,6 +44,7 @@ class BulkNormal {
                 } 
             */
             },
+            tokenBasic: {},
             historyPrice: {},
             historyTransacton: {}
         } 

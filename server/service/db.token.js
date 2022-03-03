@@ -1,17 +1,20 @@
 require('dotenv').config();
 const EnumChainId = require('../../enum/chain.id');
 const EnumMainTokens = require('../../enum/mainTokens');
+const UtilsAddresses = require('../../utils/addresses');
 var TokenBasic = require('../models/token_basic');
 var ServiceHistory = require('./db.history');
 let TOKENS_PER_PAGE = 25;
 
+
+
 async function findByContract( contract ){
-    let tokenInfos = await TokenBasic.findOne({ contract: contract }).lean().exec();
+    let tokenInfos = await TokenBasic.findOne({ contract: UtilsAddresses.toCheckSum(contract) }).lean().exec();
     if( !tokenInfos || tokenInfos.name == "$NULL" ) { return null }
     return tokenInfos;
 }
 async function getSymbolFromContract( contract ){
-    let tokenInfos = await TokenBasic.findOne({ contract: contract }).select({ symbol: 1 }).lean().exec();
+    let tokenInfos = await TokenBasic.findOne({ contract: UtilsAddresses.toCheckSum(contract) }).select({ symbol: 1 }).lean().exec();
     if( !tokenInfos || tokenInfos.name == "$NULL" ) { return null }
     return tokenInfos.symbol;
 }
@@ -20,7 +23,7 @@ async function searchByUrlOrContract( urlOrContract ){
     let tokens = await TokenBasic.find({ 
         $or: [
             {name: { $regex: '.*' + query + '.*', $options: 'i' }}, 
-            {contract: urlOrContract }
+            {contract: { $regex: '.*' + query + '.*', $options: 'i' }}
         ] 
     })
     .select({ name: 1, symbol: 1, contract: 1, pairs_count: 1 })
@@ -65,7 +68,7 @@ async function getPairs( contract ){
 }
 async function getPairsMultiple( contracts ){
     for( let i in contracts ){
-        contracts[i] = contracts[i];
+        contracts[i] = UtilsAddresses.toCheckSum(contracts[i]);
     }
 
     let tokensPairs = await ServiceHistory.findPairsMultiple( contracts );
@@ -190,34 +193,49 @@ async function getMainPair( contract ){
 async function getMainPairMultiple( contracts ){
 
     for( let i in contracts ){
-        contracts[i] = contracts[i];
+        contracts[i] = UtilsAddresses.toCheckSum(contracts[i]);
     }
 
     let tokensPairs = await getPairsMultiple( contracts ) // tokenAddress => { pair address: pair informations }
     let tokensSupplies = await getSupplyMultiple( contracts )
 
+    
+
     let mainPairs = {};
     for( let token in tokensPairs ){
         let pairs = tokensPairs[token];
         mainPairs[token] = { mainPair: null, mainPairVal: 0, pairInfos: {}, totalSupply: tokensSupplies[token] }
+
         for( let pair in pairs ){
+
+            
+            
             let pairInfos = pairs[pair];
+
+
             if( pairInfos.mainToken === EnumMainTokens[pairInfos.chain].MAIN ) {
+              
                 if( pairInfos.mainReserveValue >  mainPairs[token].mainPairVal ){
+                   
                     mainPairs[token].mainPair = pair;
                     mainPairs[token].mainPairVal = pairInfos.mainReserveValue;
                     mainPairs[token].pairInfos = pairInfos;
                 }
             }
             else if( EnumMainTokens[pairInfos.chain].STABLECOINS.includes( pairInfos.mainToken ) ) {
+               
                 if( pairInfos.mainReserveValue >  mainPairs[token].mainPairVal ) {
+                    
                     mainPairs[token].mainPair = pair;
                     mainPairs[token].mainPairVal = pairInfos.mainReserveValue;
                     mainPairs[token].pairInfos = pairInfos;
                 }
             }
         }
-        if( !mainPairs[token] ) mainPairs[token].mainPair = Object.keys( pairs )[0]; // if no mainPair was found, return the first pair inside the token pairs
+        if( !mainPairs[token] ) {  // if no mainPair was found, return the first pair inside the token pairs
+            
+            mainPairs[token].mainPair = Object.keys( pairs )[0];
+        }
     }
     return mainPairs;
 }

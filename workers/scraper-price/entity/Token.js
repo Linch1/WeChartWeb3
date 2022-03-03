@@ -1,11 +1,13 @@
 const EnumAbi = require('../../../enum/abi');
+const EnumBulkTypes = require('../../../enum/bulk.records.type');
 const EnumChainId = require('../../../enum/chain.id');
 const TokenBasic = require('../../../server/models/token_basic');
 
 class Token {
-    constructor( cache, web3 ){
+    constructor( cache, web3, bulk ){
         this.cache = cache;
         this.web3 = web3;
+        this.bulk = bulk;
     }
     async getToken( token ){
         
@@ -35,7 +37,6 @@ class Token {
                     name = await token_contract.methods.name().call();
                     supply = parseInt( await token_contract.methods.totalSupply().call() )/(10**token_decimals);
                     symbol = await token_contract.methods.symbol().call();
-
                     tokenInfo = {
                         contract: token,
                         pairs_count: 0,
@@ -44,6 +45,7 @@ class Token {
                         symbol: symbol,
                         total_supply: supply,
                     }
+                    this.bulk.bulk_normal.setNewDocument( token, EnumBulkTypes.TOKEN_BASIC, tokenInfo );
                 } catch (error) {
                     console.log('[ERROR] Cannot retrive token informations', error);
                 }

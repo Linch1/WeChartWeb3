@@ -9,7 +9,8 @@ const EnumBulkTypes = require('../../../enum/bulk.records.type');
 let modelsMapping = {
     [EnumBulkTypes.TOKEN_HISTORY]: TokenHistory,
     [EnumBulkTypes.HISTORY_PRICE]: HistoryPrice,
-    [EnumBulkTypes.HISOTRY_TRANSACTION]: HistoryTransaction
+    [EnumBulkTypes.HISOTRY_TRANSACTION]: HistoryTransaction,
+    [EnumBulkTypes.TOKEN_BASIC]: TokenBasic
 }
 
 /**
@@ -20,6 +21,7 @@ class BulkTime {
         this.BulkWriteOperations = {
             tokenHistory: {},
             historyPrice: {},
+            tokenBasic: {},
             historyTransacton: {}
         } 
         this.cache = cache;

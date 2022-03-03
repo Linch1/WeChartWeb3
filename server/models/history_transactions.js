@@ -22,5 +22,12 @@ historyTransactionSchema.index({  pair: 1 });
 historyTransactionSchema.index({  dependantToken: 1 });
 historyTransactionSchema.index({  mainToken: 1 });
 historyTransactionSchema.index({  router: 1 });
+/*
+db.historytransactions.ensureIndex({  pair: 1 });
+db.historytransactions.ensureIndex({  dependantToken: 1 });
+db.historytransactions.ensureIndex({  mainToken: 1 });
+db.historytransactions.ensureIndex({  router: 1 });
+*/
+
 module.exports = mongoose.model('historyTransaction', historyTransactionSchema);
 

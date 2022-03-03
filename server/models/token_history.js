@@ -42,9 +42,20 @@ var tokenHistorySchema = mongoose.Schema({
     }
     
 }, { timestamps: { createdAt: 'created_at' } });
-tokenHistorySchema.index({ 
-    'token0.contract': 1, 'token1.contract': 1, 
-    'variation.daily': 1, pair: 1, router: 1,
-    chain: 1
-});
+
+tokenHistorySchema.index({'token0.contract': 1});
+tokenHistorySchema.index({'token1.contract': 1});
+tokenHistorySchema.index({'variation.daily': 1});
+tokenHistorySchema.index({pair: 1});
+tokenHistorySchema.index({router: 1});
+tokenHistorySchema.index({chain: 1});
+/*
+db.tokenhistories.ensureIndex({'token0.contract': 1});
+db.tokenhistories.ensureIndex({'token1.contract': 1});
+db.tokenhistories.ensureIndex({variation.daily': 1});
+db.tokenhistories.ensureIndex({pair: 1});
+db.tokenhistories.ensureIndex({router: 1});
+db.tokenhistories.ensureIndex({chain: 1});
+*/
+
 module.exports = mongoose.model('TokenHistory', tokenHistorySchema);

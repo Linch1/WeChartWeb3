@@ -5,7 +5,6 @@ const Bulk = require("./bulk/Bulk");
 const Cache = require("./Cache");
 const Token = require("./entity/Token");
 
-
 const EnumAbi = require("../../enum/abi");
 const EnumMainTokens = require("../../enum/mainTokens");
 const EnumBulkTypes = require("../../enum/bulk.records.type");
@@ -19,40 +18,54 @@ abiDecoder.addABI(EnumAbi[EnumChainId.BSC].ROUTERS.PANCAKE);
 function relDiff( today, yesterday ) {
     return  100 * ( ( today - yesterday ) / ( (today+yesterday)/2 ) );
 }
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 class Scraper {
-    constructor ( web3, CHAIN_MAIN_TOKEN_PRICE ) {
+    constructor ( web3 ) {
         this.web3 = web3;
         this.UPDATE_PRICE_INTERVAL = process.env.WRITE_TO_DB_SECONDS ; // create a new record for the prices every x seconds
-        this.CHAIN_MAIN_TOKEN_PRICE = CHAIN_MAIN_TOKEN_PRICE;
-
-        this.ROUTERS = []; // the routers allowed
-        for( let router of Object.values(EnumContracts[EnumChainId.BSC].ROUTERS) ) this.ROUTERS.push(router );
+        this.CHAIN_MAIN_TOKEN_PRICE = 0;
         
         this.cache = new Cache();
         this.bulk = new Bulk( this.cache );
 
-        this.tokens = new Token( this.cache, this.web3 );
+        this.tokens = new Token( this.cache, this.web3, this.bulk  );
         this.tokenHistories = new TokenHistory( this.cache );
         this.historyPrices = new HistoryPirce( this.cache );
+        this.loopUpdateMainTokenPrice();
     }
 
-    async calculatePriceFromReserves( txLogs, pairAddress ) {
+    areEqualAdd( add1, add2 ){
+        return add1.toLowerCase() == add2.toLowerCase();
+    }
+    isMainToken( contract ){
+        return this.areEqualAdd(contract, EnumMainTokens[EnumChainId.BSC].MAIN);
+    }
+    
 
-        let hash = txLogs.transactionHash;
-        let tx = await this.web3.eth.getTransaction(hash);
-        let sender = tx.from;
-        let reciver = tx.to;
+    async calculatePriceFromReserves( hash, router, sender, params, pair ) {
 
-        console.log(`[SCRAPING] ${pairAddress} | ${hash} `)
+        let START = Date.now();
+
+        // console.log(`[TIME] Retrive tx informations: ${(Date.now()-START)/1000}`);
+        // START = Date.now();
+        //let hash = txLogs.transactionHash;
+        //let tx = await this.web3.eth.getTransaction(hash); // modificare
+        //let sender = tx.from;
+        //let reciver = tx.to;
+
+        
         await this.updatePairPriceWithReserves(
             sender,
-            reciver,
+            router,
             hash,
-            pairAddress,
+            pair,
             //amountIn
         );
 
+        console.log(`[TIME] Updated prices: ${(Date.now()-START)/1000}`);
     }
 
     // returns an array [ mainToken, dependantToken ];
@@ -66,15 +79,26 @@ class Scraper {
        // compare wich of the tokens is used more frequently to create pairs. This means that the one with more pairs is the more common used
 
        let pairs_comparison; // true if first token is the main one, else false
-       if( first_token.pairs_count == latest_token.pairs_count ){
-            if( EnumMainTokens[EnumChainId.BSC].STABLECOINS.includes(first_token.contract.toLowerCase()) ) pairs_comparison = true;
-            else if( EnumMainTokens[EnumChainId.BSC].STABLECOINS.includes(latest_token.contract.toLowerCase()) ) pairs_comparison = false;
-            else if ( EnumMainTokens[EnumChainId.BSC].WBNB == first_token.contract.toLowerCase() ) pairs_comparison = true;
-            else if ( EnumMainTokens[EnumChainId.BSC].WBNB == latest_token.contract.toLowerCase() ) pairs_comparison = false;
-
-       } else {
+        // cross chain
+        if(
+            this.areEqualAdd(EnumMainTokens[EnumChainId.BSC].MAIN, first_token.contract) &&
+            EnumMainTokens[EnumChainId.BSC].STABLECOINS.includes(latest_token.contract)
+        ) {
+            pairs_comparison = false;
+        } else if(
+            this.areEqualAdd(EnumMainTokens[EnumChainId.BSC].MAIN, latest_token.contract) &&
+            EnumMainTokens[EnumChainId.BSC].STABLECOINS.includes(first_token.contract)
+        ){
+            pairs_comparison = true;
+        }
+        else if( first_token.pairs_count == latest_token.pairs_count ){
+            if( EnumMainTokens[EnumChainId.BSC].STABLECOINS.includes(first_token.contract) ) pairs_comparison = true;
+            else if( EnumMainTokens[EnumChainId.BSC].STABLECOINS.includes(latest_token.contract) ) pairs_comparison = false;
+            else if ( this.areEqualAdd(EnumMainTokens[EnumChainId.BSC].MAIN, first_token.contract) ) pairs_comparison = true;
+            else if ( this.areEqualAdd(EnumMainTokens[EnumChainId.BSC].MAIN, latest_token.contract) ) pairs_comparison = false;
+        } else {
             pairs_comparison = first_token.pairs_count > latest_token.pairs_count; // here pairs_count
-       }
+        }
        
        let main_token = pairs_comparison ? first_token : latest_token;
        let dependant_token = pairs_comparison ? latest_token : first_token;
@@ -92,6 +116,8 @@ class Scraper {
         //amountIn
     ){
 
+        let START = Date.now();
+
         let pair_contract = pairAddress;
         let pairWeb3Contract =  await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].PAIR.PANCAKE, pair_contract );
         let first_reserves;
@@ -105,36 +131,53 @@ class Scraper {
             return console.log( '[ERROR] CANNOT RETRIVE RESERVES', error );
         }
 
+        console.log(`[TIME] Retrive reserves: ${(Date.now()-START)/1000}`);
+        START = Date.now();
+
         let tokenHistory = await this.tokenHistories.getTokenHistory( pair_contract );
+
+        //console.log(`[TIME] Retrive history: ${(Date.now()-START)/1000}`);
+        //START = Date.now();
 
         if(! this.bulk.bulk_normal.getHistory( pair_contract, EnumBulkTypes.TOKEN_HISTORY ) ) 
             this.bulk.bulk_normal.intializeBulkForContract( pair_contract, EnumBulkTypes.TOKEN_HISTORY );
+
+        // console.log(`[TIME] Initialize history bulk: ${(Date.now()-START)/1000}`);
+        // START = Date.now();
         
         let token0Infos = await this.tokens.getToken( token0 );
         let token1Infos = await this.tokens.getToken( token1 );
+        
+        // console.log(`[TIME] Retrive tokens: ${(Date.now()-START)/1000}`);
+        // START = Date.now();
+
         if( !token0Infos || !token0Infos.contract || !token1Infos || !token1Infos.contract ) return;
 
         let [ mainToken, dependantToken ] = await this.tokenHierarchy(token0Infos, token1Infos, tokenHistory); // get who is the main token in the pair
+
+        // console.log(`[TIME] Retrive token hierarchy: ${(Date.now()-START)/1000}`);
+        // START = Date.now();
         
-        let mainTokenIsBNB = mainToken.contract == EnumMainTokens[EnumChainId.BSC].WBNB.address;
+        // cross chain
+        let mainTokenIsBNB = this.isMainToken( mainToken.contract );
 
         let dependantTokenPrice = null; // calculate the dependant token price
         if( mainToken.contract == token0 ) dependantTokenPrice = (first_reserves[0]/10**mainToken.decimals)/(first_reserves[1]/10**dependantToken.decimals); // here decimals
         else dependantTokenPrice = (first_reserves[1]/10**mainToken.decimals)/(first_reserves[0]/10**dependantToken.decimals); 
-        
-    
+
         if( mainTokenIsBNB ){ // if the main token was BNB then multiply for get the token usd value
-            console.log('[MAIN PRICE]', this.CHAIN_MAIN_TOKEN_PRICE[0])
-            if(this.CHAIN_MAIN_TOKEN_PRICE[0]){
-                dependantTokenPrice = dependantTokenPrice * this.CHAIN_MAIN_TOKEN_PRICE[0];
+            if(this.CHAIN_MAIN_TOKEN_PRICE){
+                dependantTokenPrice = dependantTokenPrice * this.CHAIN_MAIN_TOKEN_PRICE;
             }
         } 
+
+        
     
         if( !tokenHistory ){
             tokenHistory = {
                 records_transactions: 0,
                 records_price: 0,
-                chain: EnumChainId.BSC,
+                chain: EnumChainId.BSC, // cross chain
                 token0: {
                     contract: token0Infos.contract,
                     name: token0Infos.name,
@@ -155,6 +198,9 @@ class Scraper {
             this.bulk.bulk_normal.setNewDocument( pair_contract, EnumBulkTypes.TOKEN_HISTORY, tokenHistory );
             this.cache.setHistory(pair_contract, tokenHistory);
         }
+
+        // console.log(`[TIME] Minor calculations: ${(Date.now()-START)/1000}`);
+        // START = Date.now();
         
         
         console.log(`[INFO] MAIN: ${mainToken.contract} | DEPENDANT: ${dependantToken.contract} | ${pairAddress}`); 
@@ -165,11 +211,17 @@ class Scraper {
 
         let pairHistory = await this.historyPrices.getHistory(pair_contract);
 
+        // console.log(`[TIME] Getting history: ${(Date.now()-START)/1000}`);
+        // START = Date.now();
+
         await this.updatePrice( 
             router, pair_contract, dependantToken.contract, mainToken.contract,
             pairHistory.latest, dependantTokenPrice, 
             reserve0, reserve1 
         );
+
+        // console.log(`[TIME] Updating price: ${(Date.now()-START)/1000}`);
+        // START = Date.now();
 
         // update the pair records
         this.bulk.bulk_normal.setTokenBulkInc( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,`records_transactions`, 1 );
@@ -189,7 +241,7 @@ class Scraper {
         }
 
         let mainReserveValue = mainReserve; 
-        if( mainTokenIsBNB ) mainReserveValue = mainReserve * this.CHAIN_MAIN_TOKEN_PRICE[0]; // if the main token of the pair is BNB then multiply the tokens in the pair reserver * bnb price
+        if( mainTokenIsBNB ) mainReserveValue = mainReserve * this.CHAIN_MAIN_TOKEN_PRICE; // if the main token of the pair is BNB then multiply the tokens in the pair reserver * bnb price
         this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY, 'mainReserveValue', mainReserveValue);
 
         // update daily variation percentage
@@ -199,6 +251,9 @@ class Scraper {
             this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY, 'variation.day', dailyVariation );
             console.log(`[UPDATING PERCENTAGE DAILY] ${pair_contract} ${dailyVariation}`)
         }
+
+        // console.log(`[TIME] Update other minor infos: ${(Date.now()-START)/1000}`);
+        // START = Date.now();
 
         /**
          * - TODO
@@ -273,7 +328,6 @@ class Scraper {
     }
 
     getTime() { return Math.floor((Date.now()/1000)/this.UPDATE_PRICE_INTERVAL) * this.UPDATE_PRICE_INTERVAL }
-    addDecimals( value, decimals ){ return value/10**decimals }
     async updatePrice( router, pair, tokenAddress, mainTokenAddress, latestHistoryPirce, newPrice, reserve0, reserve1 ) {
     
         let time = this.getTime();
@@ -342,6 +396,25 @@ class Scraper {
                 
             this.bulk.bulk_normal.setTokenBulkSet(pair, EnumBulkTypes.TOKEN_HISTORY, 'value', newPrice );
             this.bulk.bulk_normal.setTokenBulkInc(pair, EnumBulkTypes.TOKEN_HISTORY, 'records_price', 1);
+        }
+    }
+
+    async loopUpdateMainTokenPrice(){
+        // cross chain
+        let FACTORY = await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].FACTORIES.PANCAKE, EnumContracts[EnumChainId.BSC].FACTORIES.PANCAKE );
+        while( true ){
+            try {
+                let mainTokenPairAddress = await FACTORY.methods.getPair( EnumMainTokens[EnumChainId.BSC].WBNB.address, EnumMainTokens[EnumChainId.BSC].USDT.address ).call();
+                let mainTokenPair = await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].PAIR.PANCAKE, mainTokenPairAddress );
+                let reserves = await mainTokenPair.methods.getReserves().call();
+                let WBNB_RESERVE = reserves[1]/10**EnumMainTokens[EnumChainId.BSC].WBNB.decimals;
+                let USDT_RESERVE = reserves[0]/10**EnumMainTokens[EnumChainId.BSC].USDT.decimals;
+                let WBNB_PRICE = USDT_RESERVE/WBNB_RESERVE;
+                this.CHAIN_MAIN_TOKEN_PRICE = WBNB_PRICE;
+            } catch (error) {
+                console.log(`[ERR UPDATING MAIN PRICE] ${error}`);
+            }
+            await sleep(5000);
         }
     }
     

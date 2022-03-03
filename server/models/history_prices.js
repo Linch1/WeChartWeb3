@@ -21,5 +21,12 @@ historyPriceSchema.index({ pair: 1 });
 historyPriceSchema.index({  dependantToken: 1 });
 historyPriceSchema.index({  mainToken: 1 });
 historyPriceSchema.index({ router: 1 });
-module.exports = mongoose.model('historyPirce', historyPriceSchema);
+
+/*
+db.historyprices.ensureIndex({  pair: 1 });
+db.historyprices.ensureIndex({  dependantToken: 1 });
+db.historyprices.ensureIndex({  mainToken: 1 });
+db.historyprices.ensureIndex({  router: 1 });
+*/
+module.exports = mongoose.model('historyPrice', historyPriceSchema);
 

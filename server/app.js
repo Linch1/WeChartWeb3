@@ -33,7 +33,7 @@ if (cluster.isMaster) {
   // pass the same server to our websocket setup function
   // the websocket server will the run on the same port
   // accepting ws:// connections
-  setupWebSocket(server);
+  // setupWebSocket(server);
 
   server.listen(PORT, () => {
     console.log("Express server listening on port " + PORT);
