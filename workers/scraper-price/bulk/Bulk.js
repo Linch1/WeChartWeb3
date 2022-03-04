@@ -1,3 +1,20 @@
+const Router = require('../../../server/models/routers');
+const TokenBasic = require('../../../server/models/token_basic');
+const TokenHistory = require('../../../server/models/token_history');
+const HistoryPrice = require('../../../server/models/history_prices');
+
+const HistoryTransaction = require('../../../server/models/history_transactions');
+const EnumBulkTypes = require('../../../enum/bulk.records.type');
+
+let modelsMapping = {
+    [EnumBulkTypes.TOKEN_HISTORY]: TokenHistory,
+    [EnumBulkTypes.HISTORY_PRICE]: HistoryPrice,
+    [EnumBulkTypes.HISOTRY_TRANSACTION]: HistoryTransaction,
+    [EnumBulkTypes.TOKEN_BASIC]: TokenBasic,
+    [EnumBulkTypes.ROUTERS]: Router,
+}
+
+
 const BulkNormal = require("./BulkNormal");
 const BulkTime = require("./BulkTime");
 
@@ -7,8 +24,8 @@ const BulkTime = require("./BulkTime");
  */
 class Bulk {
     constructor( cache ){
-        this.bulk_normal = new BulkNormal();
-        this.bulk_time = new BulkTime( cache );
+        this.bulk_normal = new BulkNormal( modelsMapping );
+        this.bulk_time = new BulkTime( cache, modelsMapping );
     }
     async execute(){
         let contracts = await this.bulk_normal.execute();

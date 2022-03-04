@@ -18,7 +18,33 @@ async function findPairsMultiple( contracts ){
     if(!documents.length) return null;
     return documents;
 }
+async function findPairsWithFilters( filter ){
+    return await TokenHistory.find(filter).lean().exec();
+}
+async function findTokensWithMultipleRouters( allowedRouters ){
+    let routers = await TokenHistory.aggregate([
+            {
+                $match: {
+                    router: { $in: allowedRouters }
+                }
+            },
+            { 
+                $group: { 
+                    _id: { router: "$router"},
+                    count: { "$sum": 1 },
+                    docs: { $push: "$$ROOT" } 
+                }
+            }
+        ],
+        {allowDiskUse: true}       // For faster processing if set is larger
+    ).exec()
+    return routers;
+}
+
+
 module.exports = {
+    findPairsWithFilters,
     findPairs,
-    findPairsMultiple
+    findPairsMultiple,
+    findTokensWithMultipleRouters
 }

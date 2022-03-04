@@ -1,29 +1,17 @@
-const mongoose = require('mongoose');
-
-const TokenBasic = require('../../../server/models/token_basic');
-const TokenHistory = require('../../../server/models/token_history');
-const HistoryPrice = require('../../../server/models/history_prices');
-const HistoryTransaction = require('../../../server/models/history_transactions');
-const EnumBulkTypes = require('../../../enum/bulk.records.type');
-
-let modelsMapping = {
-    [EnumBulkTypes.TOKEN_HISTORY]: TokenHistory,
-    [EnumBulkTypes.HISTORY_PRICE]: HistoryPrice,
-    [EnumBulkTypes.HISOTRY_TRANSACTION]: HistoryTransaction,
-    [EnumBulkTypes.TOKEN_BASIC]: TokenBasic
-}
+const EnumBulkTypes = require("../../../enum/bulk.records.type");
 
 /**
  * Manage bulk operations on objects that have strong time connection
  */
 class BulkTime {
-    constructor( cache ) {
-        this.BulkWriteOperations = {
-            tokenHistory: {},
-            historyPrice: {},
-            tokenBasic: {},
-            historyTransacton: {}
+    constructor( cache, modelsMapping ) {
+    
+        this.BulkWriteOperations = {};
+        for( let key in modelsMapping ){
+            this.BulkWriteOperations[key] = {};
         } 
+
+        this.modelsMapping = modelsMapping;
         this.cache = cache;
     }
     getHistories(type){
@@ -134,7 +122,7 @@ class BulkTime {
         let updatedContracts = [];
         for( let typeKey in EnumBulkTypes ){
             let type = EnumBulkTypes[typeKey];
-            updatedContracts = [ ...( await this.executeUtil( type, modelsMapping[type] ) ), ...updatedContracts ];
+            updatedContracts = [ ...( await this.executeUtil( type, this.modelsMapping[type] ) ), ...updatedContracts ];
         }
         return updatedContracts;
     }

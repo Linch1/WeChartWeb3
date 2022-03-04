@@ -77,7 +77,7 @@ const scraper = new Scraper( web3_https );
     var subscription = web3_wss.eth.subscribe('logs', {
         topics: filter
     }, async function(error, tx){
-        
+
         if( error ) return console.log( error );
 
         let hash = tx.transactionHash;

@@ -12,10 +12,19 @@ class Cache {
         this.CACHE = {
             token: {}, // [tokenAddress] => TokenBasic object
             tokenHistory: {}, // [pairAddress] => TokenHistory object of this pair
-            historyPrice: {} // [pairAddress] => { latest: Latest History Price , hour: One Hour Ago History Price, day: One Day Ago History Price }
+            historyPrice: {}, // [pairAddress] => { latest: Latest History Price , hour: One Hour Ago History Price, day: One Day Ago History Price }
+            router: {}, // [routerContract] => { valid: if the router is valid }
         };
 
     }
+    
+    getRouter( routerAdd ){
+        return this.CACHE.router[routerAdd];
+    }
+    setRouter( routerAdd, fields ){
+        this.CACHE.router[routerAdd] = fields;
+    }
+
     getTokenHistory( pair ){
         return this.CACHE.tokenHistory[pair];
     }

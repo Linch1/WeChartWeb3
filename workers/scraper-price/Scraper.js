@@ -12,6 +12,7 @@ const TokenHistory = require("./entity/TokenHistory");
 const HistoryPirce = require("./entity/HistoryPirce");
 
 const abiDecoder = require('abi-decoder');
+const Router = require("./entity/Routers");
 abiDecoder.addABI(EnumAbi[EnumChainId.BSC].TOKEN);
 abiDecoder.addABI(EnumAbi[EnumChainId.BSC].ROUTERS.PANCAKE);
 
@@ -31,6 +32,7 @@ class Scraper {
         this.cache = new Cache();
         this.bulk = new Bulk( this.cache );
 
+        this.routers = new Router( this.cache, this.web3, this.bulk );
         this.tokens = new Token( this.cache, this.web3, this.bulk  );
         this.tokenHistories = new TokenHistory( this.cache );
         this.historyPrices = new HistoryPirce( this.cache );
@@ -45,7 +47,7 @@ class Scraper {
     }
     
 
-    async calculatePriceFromReserves( hash, router, sender, params, pair ) {
+    async calculatePriceFromReserves( hash, routerAdd, sender, params, pair ) {
 
         let START = Date.now();
 
@@ -57,9 +59,10 @@ class Scraper {
         //let reciver = tx.to;
 
         
+        
         await this.updatePairPriceWithReserves(
             sender,
-            router,
+            routerAdd,
             hash,
             pair,
             //amountIn
@@ -134,6 +137,12 @@ class Scraper {
         console.log(`[TIME] Retrive reserves: ${(Date.now()-START)/1000}`);
         START = Date.now();
 
+        
+
+        console.log(`[TIME] Checking if router is valid: ${(Date.now()-START)/1000}`);
+        START = Date.now();
+
+
         let tokenHistory = await this.tokenHistories.getTokenHistory( pair_contract );
 
         //console.log(`[TIME] Retrive history: ${(Date.now()-START)/1000}`);
@@ -147,6 +156,8 @@ class Scraper {
         
         let token0Infos = await this.tokens.getToken( token0 );
         let token1Infos = await this.tokens.getToken( token1 );
+
+        
         
         // console.log(`[TIME] Retrive tokens: ${(Date.now()-START)/1000}`);
         // START = Date.now();
@@ -154,6 +165,8 @@ class Scraper {
         if( !token0Infos || !token0Infos.contract || !token1Infos || !token1Infos.contract ) return;
 
         let [ mainToken, dependantToken ] = await this.tokenHierarchy(token0Infos, token1Infos, tokenHistory); // get who is the main token in the pair
+
+        this.routers.getRouter( router, token0, token1, token0Infos.decimals );
 
         // console.log(`[TIME] Retrive token hierarchy: ${(Date.now()-START)/1000}`);
         // START = Date.now();

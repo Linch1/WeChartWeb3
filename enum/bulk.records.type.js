@@ -3,6 +3,6 @@ const EnumBulkTypes = {
     TOKEN_BASIC: 'tokenBasic',
     HISTORY_PRICE: 'historyPrice',
     HISOTRY_TRANSACTION: 'historyTransacton',
-    
+    ROUTERS: 'routers'
 }
 module.exports = EnumBulkTypes;
