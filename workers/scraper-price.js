@@ -61,6 +61,10 @@ const scraper = new Scraper( web3_https );
 
     // let queue = new Queue(200, scanTransactionCallback);
 
+    await scraper.tokenHistories.loadAllPairs(); // load and cache all the current histories to speed up the workers
+
+    console.log('Loaded pairs');
+    
     let TotalTx = 0;
 
     mongoose.connect(configDB.url, {

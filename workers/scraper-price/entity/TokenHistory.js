@@ -19,5 +19,16 @@ class TokenHistory {
         }
         return tokenHistory;
     }
+    async loadAllPairs(){
+        let allHistories = await TokenHistoryModel.find()
+        .select({ 'token0.contract': 1, 'token1.contract': 1, pair: 1 })
+        .lean()
+        .exec();
+        for( let history of allHistories ){
+            this.cache.setPair( history.pair, {
+                tokens: [history.token0.contract, history.token1.contract ]
+            })
+        }
+    }
 }
 module.exports = TokenHistory;

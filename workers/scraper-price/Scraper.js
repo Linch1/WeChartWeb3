@@ -124,20 +124,32 @@ class Scraper {
         let pair_contract = pairAddress;
         let pairWeb3Contract =  await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].PAIR.PANCAKE, pair_contract );
         let first_reserves;
-        let token0;
-        let token1;
+
+        let cachedPair = this.cache.getPair(pairAddress);
+        let token0 = 0;
+        let token1 = 0;
         try {
             first_reserves = await pairWeb3Contract.methods.getReserves().call();
-            token0 = await pairWeb3Contract.methods.token0().call();
-            token1 = await pairWeb3Contract.methods.token1().call();
+
+            console.log(`[TIME] Retrive reserves: ${(Date.now()-START)/1000}`);
+            START = Date.now();
+            
+            if( !cachedPair ){ 
+                console.log('[PAIR] Not cached')
+                token0 = await pairWeb3Contract.methods.token0().call();
+                token1 = await pairWeb3Contract.methods.token1().call();
+                // some lines below the pair is setted in the cache
+            } else {
+                token0 = cachedPair.tokens[0];
+                token1 = cachedPair.tokens[1];
+            }
+
         } catch (error) {
             return console.log( '[ERROR] CANNOT RETRIVE RESERVES', error );
         }
 
-        console.log(`[TIME] Retrive reserves: ${(Date.now()-START)/1000}`);
+        console.log(`[TIME] Retrive pair info: ${(Date.now()-START)/1000}`);
         START = Date.now();
-
-        
 
         console.log(`[TIME] Checking if router is valid: ${(Date.now()-START)/1000}`);
         START = Date.now();
@@ -157,6 +169,16 @@ class Scraper {
         let token0Infos = await this.tokens.getToken( token0 );
         let token1Infos = await this.tokens.getToken( token1 );
 
+        this.cache.setPair( // create or update the pair inside the cache
+            pairAddress, 
+            { 
+                tokens: [token0, token1],
+                reserves: [ 
+                    first_reserves[0]/(10**token0Infos.decimals),  
+                    first_reserves[1]/(10**token1Infos.decimals)
+                ] 
+            }
+        );
         
         
         // console.log(`[TIME] Retrive tokens: ${(Date.now()-START)/1000}`);
