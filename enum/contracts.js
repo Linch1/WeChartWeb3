@@ -22,8 +22,6 @@ const EnumContracts = {
             AUTOSHARK: UtilsAddresses.toCheckSum("0xe759dd4b9f99392be64f1050a6a8018f73b53a13"),
             DEFINIX: UtilsAddresses.toCheckSum("0x43ebb0cb9bd53a3ed928dd662095ace1cef92d19"),
             SUSHISWAP: UtilsAddresses.toCheckSum("0xc35dadb65012ec5796536bd9864ed8773abc74c4"),
-            
-
         }
     }
 };

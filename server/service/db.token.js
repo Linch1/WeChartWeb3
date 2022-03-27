@@ -135,7 +135,6 @@ async function findSupplyMultiple( contracts ){
 async function getMainPair( contract ){
 
     let pairs = await getPairs( contract ) // tokenAddress => pair informations
-
     let token = await TokenBasic.findOne({contract : contract}).select({total_supply: 1}).lean().exec();
     let totalSupply = token ? token.total_supply : 0;
    
@@ -165,12 +164,15 @@ async function getMainPair( contract ){
     if( !mainPair ) {
         mainPair = Object.keys( pairs )[0];
         let pairDetails = pairs[mainPair];
-        
-        if( !pairDetails )  return {
-            mainPair: null,
-            mainPairVal: 0,
-            pairInfos: {},
-            totalSupply: totalSupply
+
+
+        if( !pairDetails )  {
+            return {
+                mainPair: null,
+                mainPairVal: 0,
+                pairInfos: {},
+                totalSupply: totalSupply
+            }
         }
 
         mainPairVal = pairDetails.mainReserveValue;

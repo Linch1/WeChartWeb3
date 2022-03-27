@@ -2,6 +2,7 @@ const EnumAbi = require('../../../enum/abi');
 const EnumBulkTypes = require('../../../enum/bulk.records.type');
 const EnumChainId = require('../../../enum/chain.id');
 const TokenBasic = require('../../../server/models/token_basic');
+const UtilsAddresses = require('../../../utils/addresses');
 
 class Token {
     constructor( cache, web3, bulk ){

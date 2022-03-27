@@ -40,11 +40,25 @@ async function findTokensWithMultipleRouters( allowedRouters ){
     ).exec()
     return routers;
 }
+async function findAllowedRoutersPairs( allowedRouters ){
+    return await TokenHistory.find({ router: { $in: allowedRouters }})
+    .select({ 'token0.contract': 1, 'token1.contract': 1, pair: 1, router: 1, reserve0: 1, reserve1: 1 })
+    .lean()
+    .exec();
+}
+async function findAllPairs(){
+    return await TokenHistory.find()
+    .select({ 'token0.contract': 1, 'token0.decimals': 1, 'token1.contract': 1, 'token1.decimals': 1, pair: 1, router: 1, reserve0: 1, reserve1: 1 })
+    .lean()
+    .exec();
+}
 
 
 module.exports = {
     findPairsWithFilters,
     findPairs,
     findPairsMultiple,
-    findTokensWithMultipleRouters
+    findTokensWithMultipleRouters,
+    findAllPairs,
+    findAllowedRoutersPairs
 }

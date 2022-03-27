@@ -21,7 +21,7 @@ class TokenHistory {
     }
     async loadAllPairs(){
         let allHistories = await TokenHistoryModel.find()
-        .select({ 'token0.contract': 1, 'token1.contract': 1, pair: 1 })
+        .select({ 'token0.contract': 1, 'token1.contract': 1, pair: 1, router: 1, reserve0: 1, reserve1: 1 })
         .lean()
         .exec();
         for( let history of allHistories ){
@@ -29,6 +29,7 @@ class TokenHistory {
                 tokens: [history.token0.contract, history.token1.contract ]
             })
         }
+        return allHistories;
     }
 }
 module.exports = TokenHistory;

@@ -1,17 +1,65 @@
 const HistoryPrice = require('../models/history_prices');
 const UtilsAddresses = require('../../utils/addresses');
 
-async function findPrices( pair, from, to, recordsCount ){
+async function findPrices( pair, from, to, recordsCount, resolution ){
 
     if( recordsCount > 350 ) recordsCount = 350;
     if( !pair || !from || !to ) return [];
 
-    let records = await HistoryPrice.find(
-      { 
-        pair: UtilsAddresses.toCheckSum(pair), 
-        time: { $lt: parseInt(to) } 
+    let records;
+    if( !resolution || resolution == 1 ){
+      records = await HistoryPrice.find(
+        { 
+          pair: UtilsAddresses.toCheckSum(pair), 
+          time: { $lt: parseInt(to) } 
+        }
+      ).sort({time: -1}).lean().limit(recordsCount).select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).exec();
+    }
+    else {
+      let multiplier = 1;
+      if( resolution == "5" ) multiplier = 5;
+      else if( resolution == "60" ) multiplier = 60;
+      else if( resolution == "720" ) multiplier = 720;
+      else if( resolution == "1D" ) multiplier = 1440;
+
+      records = await HistoryPrice.aggregate([
+          {
+              "$match": {
+                  "pair" : UtilsAddresses.toCheckSum(pair),
+                  time: { $lt: parseInt(to) } 
+              },
+          },
+          { 
+              "$group": {
+                  "_id": {
+                      "interval": {
+                          "$subtract": [ 
+                              "$time",
+                              { "$mod": ["$time", multiplier * 60] }
+                          ]
+                      },
+                      
+                  },
+                  "high": { "$max": "$value" },
+                  "low": { "$min": "$value" },
+                  "open": { "$first": "$value" },
+                  "close": { "$last": "$value" },
+              },
+          },
+          {
+              "$sort": {
+                  "_id.interval": -1
+              }
+          },
+          {
+            "$limit": parseInt(recordsCount) 
+          }
+      ]);
+      for( let i = 0; i < records.length; i++  ){
+        records[i].time = records[i]._id.interval
       }
-    ).sort({time: -1}).lean().limit(recordsCount).select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).exec();
+      console.log('\nFound prices with resolution: ', resolution, records.length, '\n');
+    }
 
     return records;
 }

@@ -3,10 +3,7 @@ var mongoose = require('mongoose');
 var pairSchema = mongoose.Schema({
     contract: String,
     valid: Boolean,
-    token0: String,
-    token1: String,
-    amount: Number
-
+    fee: Number
 }, { timestamps: { createdAt: 'created_at' } });
 
 pairSchema.index({'contract': 1});

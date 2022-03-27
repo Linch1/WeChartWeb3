@@ -7,14 +7,17 @@ router.get('/:pair',
     async function ( req, res ) {
         let from = req.query.from; 
         let to = req.query.to;
- 
+
+        let resolution = req.query.resolution;
         let records = req.query.countBack;
         let pair = req.params.pair;
 
         if( !from || !to || !records || !pair ) return res.status(400).send({ error: { msg: "Invalid params", data: [] }});
 
+        console.log('\nFinding prices: ', resolution, from, to, '\n');
         let priceRecords = await Services.price.findPrices( pair, from, to, records  );
-
+        console.log('\nFound prices:', resolution, from, to, '\n');
+        
         if( !priceRecords || !priceRecords.length ) {
             let last_history = await Services.price.findLastPrice( pair, from, to );
             if(!last_history) return res.status(200).send({ success: { msg: "success", data: [] }});

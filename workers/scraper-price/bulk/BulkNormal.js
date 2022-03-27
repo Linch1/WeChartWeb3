@@ -56,9 +56,11 @@ class BulkNormal {
     intializeBulkUpdate( pair, type ){
         if(!this.BulkWriteOperations[type][pair].update) {
             console.log(`[BULK ADD UPDATE ${type}] ${Object.keys(this.BulkWriteOperations[type]).length} ${pair}`);
+            let filter = { pair: pair };
+            if( type === EnumBulkTypes.TOKEN_BASIC ) filter = { contract: pair };
             this.BulkWriteOperations[type][pair].update = {
                 updateOne: {
-                    filter: { pair: pair },
+                    filter: filter,
                     update: { 
                         $push: { }, 
                         $addToSet: { },
@@ -118,6 +120,12 @@ class BulkNormal {
         this.intializeBulkUpdate( pair, type );
         let setObj = this.BulkWriteOperations[type][pair].update.updateOne.update['$set'];
         setObj[path] = toSet;
+    }
+    setTokenBulkUnset( pair, type, path, toUnset ){
+        this.intializeBulkForContract( pair, type );
+        this.intializeBulkUpdate( pair, type );
+        let setObj = this.BulkWriteOperations[type][pair].update.updateOne.update['$unset'];
+        setObj[path] = toUnset;
     }
     getTokenBulkSet( pair, type, path ){
         if( this.BulkWriteOperations[type][pair] )
@@ -182,6 +190,7 @@ class BulkNormal {
 
                 if( clonedPush.updateOne.update['$inc'] || clonedPush.updateOne.update['$set'] ||  clonedPush.updateOne.update['$addToSet'] ){
                     delete clonedSet.updateOne.update['$push'];
+                    clonedPush.updateOne.upsert = true;
                     toExecuteSet.push( clonedSet );
                 }
             }
@@ -189,7 +198,7 @@ class BulkNormal {
 
         //console.log( type, "toExecuteInsert: ", JSON.stringify(toExecuteInsert));
         //console.log( type, "\n\ntoExecutePush: ", JSON.stringify(toExecutePush));
-        //console.log( type, "\n\ntoExecuteSet: ", JSON.stringify(toExecuteSet));
+        //console.log("\n\ntoExecuteSet: ", type, JSON.stringify(toExecuteSet));
        
         await model.insertMany(toExecuteInsert);
         console.log("EXECUTED INSERT");

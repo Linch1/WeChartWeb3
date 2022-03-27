@@ -2,8 +2,9 @@ var mongoose = require('mongoose');
 
 var tokenHistorySchema = mongoose.Schema({
 
-    records_transactions: Number,
-    records_price: Number,
+    records_date: Number, // used to reset recrods field on day change
+    records_transactions: Number, // daily transactions
+    records_price: Number, // daily price records
 
     chain: Number,
     
@@ -13,12 +14,14 @@ var tokenHistorySchema = mongoose.Schema({
     token0: {
         contract: String,
         name: String,
-        symbol: String
+        symbol: String,
+        decimals: Number,
     },
     token1: {
         contract: String,
         name: String,
-        symbol: String
+        symbol: String,
+        decimals: Number,
     },
 
     mainToken: String,

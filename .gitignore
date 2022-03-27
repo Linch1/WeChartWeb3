@@ -4,3 +4,5 @@ scraper.log
 missing.json
 utils/arbitrage
 utils/scraper
+workers/scraper-price/arbitrage
+workers/scraper-price/thread

@@ -19,7 +19,6 @@ async function getTokenBasicInfos( contract ){
     let tokenInfo = {};
 
     let tokenRetrived = await Services.token.findByContract( contract );
-    console.log('Retrived token basic: ', tokenRetrived)
     if( tokenRetrived ) tokenInfo = tokenRetrived;
 
     let pair = await mainPairHandler( contract );
@@ -50,22 +49,18 @@ router.get('/info/:contract',
         let contract = req.params.contract;
         let tokenInfo = await getTokenBasicInfos( contract );
 
-        console.log('retrived basic infos', tokenInfo);
 
         // implemented custom endpoint to retrive informations 
         let allPairs = await Services.token.getPairs( contract );
         tokenInfo.pairs = allPairs;
-        console.log('Retrived pairs', allPairs);
         
         let fromVoting = await ApiVoting.getTokenInfos( contract );
-        console.log('retrived voting info', fromVoting)
         if( fromVoting.success ) {
             let data = fromVoting.success.data;
             delete data._id;
             tokenInfo = {...tokenInfo, ...data }
         }
         // end custom
-        console.log('Sending response');
         return res.status(200).send({ success: { msg: "success", data: tokenInfo }});
     }
 )

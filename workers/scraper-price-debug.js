@@ -179,9 +179,7 @@ async function scanTransactionCallback(hash, pair, pairDatas) {
         autoIndex: false,
         useNewUrlParser: true,
         useUnifiedTopology: true
-    }).then(async () => { 
-        loopUpdateOnDb(); // starts the loop that updates the db every 5 seconds
-    })
+    }).then(async () => { })
     .catch(err => { console.log('MongoDB connection unsuccessful', err); process.exit() });
 
     let scrapedTxs = []; 
@@ -191,12 +189,7 @@ async function scanTransactionCallback(hash, pair, pairDatas) {
         if( scrapedTxs.indexOf(hash) != -1 ) return;
         
         scrapedTxs.push(hash);
-        let receipt;
-        try {
-            receipt = await web3_https.eth.getTransactionReceipt(hash);
-        } catch (error) {
-            return console.log('[RECEIPT ERR]', error);
-        }
+        let receipt = await web3_https.eth.getTransactionReceipt(hash);
         if(!receipt) return;
         
         let relevantEvents = organizeEvents(hash, receipt);
@@ -205,39 +198,11 @@ async function scanTransactionCallback(hash, pair, pairDatas) {
         for( let pair in relevantEvents ) scanTransactionCallback( hash, pair, relevantEvents[pair] );
     }
      
-    let queue = new Queue(100, logCallback);
-    let filter = [ syncSign ];
-    var subscription = web3_wss.eth.subscribe('logs', {
-        topics: filter
-    }, 
-        async (error, tx) => {
-            console.log('Detected new log', tx.transactionHash);
-            queue.add(error, tx) 
-        }
-    );
+    
+    // 0x82d3099e036ddfa66b8d70bd16bc091685b7f919feb6b692aaea364ca08cea8e to debug
+    // 0x72bb1aa2b902a55c1fefe63f872325a95f35f15edfcd76a187fcf39f649e65af to debug
 
-    // unsubscribes the subscription
-    subscription.unsubscribe(function(error, success){
-        if(success) console.log('Successfully unsubscribed!');
-    });
-
-
-    /**
-     * @description Executes the stored queries inside BulkWriteOperations object of the scraper.
-     * The queries are stored inside this object instead of directly executed to reduce the write operations on the database
-     * and to take advandage of the bulk operations by aggregating all the stored queries
-     * @returns null
-     */
-    function getWriteTime( timeMs ) { return Math.floor( (timeMs/1000) / process.env.WRITE_TO_DB_SECONDS) * process.env.WRITE_TO_DB_SECONDS; }
-    async function loopUpdateOnDb(){
-        while(true){
-            let now = getWriteTime(Date.now());
-            await sleep(1000);
-            // push the updates every minute change to optimize the writes on the database
-            if( now != getWriteTime( Date.now() + 1000 ) ) { await scraper.bulk.execute(); }
-            // await sleep(5000);
-            // await scraper.bulk.execute();
-        }
-    }
+    logCallback(null, {transactionHash: "0xd7fec4fe93278b62ff364de21c33f57add1fec4046046b46c0d08c32007207f7"})
+    
     
 })();

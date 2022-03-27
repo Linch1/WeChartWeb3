@@ -14,7 +14,7 @@ class Cache {
             tokenHistory: {}, // [pairAddress] => TokenHistory object of this pair
             historyPrice: {}, // [pairAddress] => { latest: Latest History Price , hour: One Hour Ago History Price, day: One Day Ago History Price }
             router: {}, // [routerContract] => { valid: if the router is valid }
-            pair: {}, // [pairAdd] => { tokens: [ token0, token1], reserves: [reserve0, reserve1]}
+            pair: {}, // [pairAdd] => { tokens: [ token0, token1], reserves: [reserve0, reserve1] }
         };
 
     }
@@ -51,9 +51,13 @@ class Cache {
     getSizePirceHistory(){
         return this.PRICES_CACHE_SIZE;
     }
-    setToken( tokenAddress, tokenInfos ){
+    setToken( tokenAddress, tokenInfos, overwrite ){
         let cacheSize = this.getSizeTokens();
-        if( this.TOKENS_CACHE_ORDER.includes(tokenAddress) ) return;
+        
+        if( this.TOKENS_CACHE_ORDER.includes(tokenAddress) ){
+            if( overwrite ) this.CACHE.token[tokenAddress] = tokenInfos;
+            else return;
+        } 
 
         console.log(`[CACHE SIZE TOKEN] ${cacheSize}`);
         if( cacheSize > this.TOKENS_CACHE_MAX_SIZE ){ // keeps the tokens cache with a fixed size

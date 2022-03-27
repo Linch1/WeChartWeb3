@@ -1,4 +1,3 @@
-
 const EnumChainId = require("../../enum/chain.id");
 const EnumContracts = require("../../enum/contracts");
 const Bulk = require("./bulk/Bulk");
@@ -13,14 +12,20 @@ const HistoryPirce = require("./entity/HistoryPirce");
 
 const abiDecoder = require('abi-decoder');
 const Router = require("./entity/Routers");
+const BigNumber = require("bignumber.js");
+const UtilsAddresses = require("../../utils/addresses");
 abiDecoder.addABI(EnumAbi[EnumChainId.BSC].TOKEN);
 abiDecoder.addABI(EnumAbi[EnumChainId.BSC].ROUTERS.PANCAKE);
 
+
 function relDiff( today, yesterday ) {
-    return  100 * ( ( today - yesterday ) / ( (today+yesterday)/2 ) );
+    return  100 * ( ( today - yesterday ) /  yesterday  );
 }
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+function todayDateUnix(){
+    return Math.ceil(Date.now()/1000 - ((Date.now()/1000)%(60*60*24)));
 }
 
 class Scraper {
@@ -36,6 +41,7 @@ class Scraper {
         this.tokens = new Token( this.cache, this.web3, this.bulk  );
         this.tokenHistories = new TokenHistory( this.cache );
         this.historyPrices = new HistoryPirce( this.cache );
+        
         this.loopUpdateMainTokenPrice();
     }
 
@@ -47,28 +53,31 @@ class Scraper {
     }
     
 
-    async calculatePriceFromReserves( hash, routerAdd, sender, params, pair ) {
+    async calculatePriceFromReserves( hash, pair, pairDatas ) {
 
-        let START = Date.now();
-
-        // console.log(`[TIME] Retrive tx informations: ${(Date.now()-START)/1000}`);
-        // START = Date.now();
-        //let hash = txLogs.transactionHash;
-        //let tx = await this.web3.eth.getTransaction(hash); // modificare
-        //let sender = tx.from;
-        //let reciver = tx.to;
-
-        
+        /*
+        pairDatas = {
+            swap: {
+                router: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
+                sender: '0xbA26c7Acd343459f99f4DF130D0aa12320DD9f3e',
+                pair: '0x7942d6f0F92797e78d87A57F28B38AD1Bfbb3Af2',
+                params: [ '0', '600000000000000000', '888644757878653721073', '0' ],
+                transfer: { sold: { token: token0Add, amount: 1 }, bought: { token: token1Add, amount: 10 } }
+            },
+            sync: {
+                pair: '0x7942d6f0F92797e78d87A57F28B38AD1Bfbb3Af2',
+                params: [ '50494653753892947974242', '34608021769967697551' ] -> [reserve0, reserve1]
+            }
+        }
+        */
         
         await this.updatePairPriceWithReserves(
-            sender,
-            routerAdd,
             hash,
             pair,
-            //amountIn
+            pairDatas.swap,
+            pairDatas.sync
         );
 
-        console.log(`[TIME] Updated prices: ${(Date.now()-START)/1000}`);
     }
 
     // returns an array [ mainToken, dependantToken ];
@@ -108,32 +117,11 @@ class Scraper {
        return [ main_token, dependant_token ];
     }
 
-
-    /**
-     * @description Add the token price inside the Bulk history
-     * @param {*} token0 address
-     * @param {*} token1 address
-     */
-    async updatePairPriceWithReserves( 
-        txSender, router, txHash, pairAddress,
-        //amountIn
-    ){
-
-        let START = Date.now();
-
-        let pair_contract = pairAddress;
-        let pairWeb3Contract =  await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].PAIR.PANCAKE, pair_contract );
-        let first_reserves;
-
-        let cachedPair = this.cache.getPair(pairAddress);
+    async getTokens(pairAddress, cachedPair){
         let token0 = 0;
         let token1 = 0;
         try {
-            first_reserves = await pairWeb3Contract.methods.getReserves().call();
-
-            console.log(`[TIME] Retrive reserves: ${(Date.now()-START)/1000}`);
-            START = Date.now();
-            
+            let pairWeb3Contract =  await new this.web3.eth.Contract( EnumAbi[EnumChainId.BSC].PAIR.PANCAKE, pairAddress );
             if( !cachedPair ){ 
                 console.log('[PAIR] Not cached')
                 token0 = await pairWeb3Contract.methods.token0().call();
@@ -143,62 +131,72 @@ class Scraper {
                 token0 = cachedPair.tokens[0];
                 token1 = cachedPair.tokens[1];
             }
-
         } catch (error) {
-            return console.log( '[ERROR] CANNOT RETRIVE RESERVES', error );
+            console.log( '[ERROR] CANNOT RETRIVE RESERVES', error );
+            return [null, null] ;
         }
+        return [token0, token1];
+    }
 
-        console.log(`[TIME] Retrive pair info: ${(Date.now()-START)/1000}`);
-        START = Date.now();
-
-        console.log(`[TIME] Checking if router is valid: ${(Date.now()-START)/1000}`);
-        START = Date.now();
-
-
-        let tokenHistory = await this.tokenHistories.getTokenHistory( pair_contract );
-
-        //console.log(`[TIME] Retrive history: ${(Date.now()-START)/1000}`);
-        //START = Date.now();
-
-        if(! this.bulk.bulk_normal.getHistory( pair_contract, EnumBulkTypes.TOKEN_HISTORY ) ) 
-            this.bulk.bulk_normal.intializeBulkForContract( pair_contract, EnumBulkTypes.TOKEN_HISTORY );
-
-        // console.log(`[TIME] Initialize history bulk: ${(Date.now()-START)/1000}`);
-        // START = Date.now();
+    /**
+     * @description Add the token price inside the Bulk history
+     * @param {*} token0 address
+     * @param {*} token1 address
+     */
+    async updatePairPriceWithReserves( 
+        /* txSender, router, txHash, pairAddress, params */
+        hash, pairAdd, swapInfo, syncInfo
+    ){
         
-        let token0Infos = await this.tokens.getToken( token0 );
-        let token1Infos = await this.tokens.getToken( token1 );
+        if ( !syncInfo ) return; // if there is no a sync event, skip this;
 
-        this.cache.setPair( // create or update the pair inside the cache
-            pairAddress, 
-            { 
-                tokens: [token0, token1],
-                reserves: [ 
-                    first_reserves[0]/(10**token0Infos.decimals),  
-                    first_reserves[1]/(10**token1Infos.decimals)
-                ] 
-            }
-        );
-        
-        
-        // console.log(`[TIME] Retrive tokens: ${(Date.now()-START)/1000}`);
-        // START = Date.now();
+        let [reserve0, reserve1] = syncInfo.params;
+        let cachedPair = this.cache.getPair(pairAdd);
 
-        if( !token0Infos || !token0Infos.contract || !token1Infos || !token1Infos.contract ) return;
+        if( !swapInfo && !cachedPair ) return; // if the pair do not exists on the db, and this is not a swap then skip. ( to avoid making any web3 call to populate the unexistant pair )
+        if( swapInfo && (!swapInfo.transfer.bought || !swapInfo.transfer.sold) ) return; // if this is a swap, and some infos miss, skip it;
+
+        let [token0, token1] = await this.getTokens(pairAdd, cachedPair);
+        
+        if(!token0 || !token1 ) return;
+        let tokenHistory = await this.tokenHistories.getTokenHistory( pairAdd );
+        let token0Infos = await this.tokens.getToken( UtilsAddresses.toCheckSum(token0) );
+        let token1Infos = await this.tokens.getToken( UtilsAddresses.toCheckSum(token1) );
+        if( !token0Infos || !token0Infos.contract || !token1Infos || !token1Infos.contract ) return; // skip if some token infos is missing;
+
+        reserve0 = reserve0/10**token0Infos.decimals;
+        reserve1 = reserve1/10**token1Infos.decimals;
+
+        if( !swapInfo && cachedPair ){
+            this.bulk.bulk_normal.setTokenBulkSet( pairAdd, EnumBulkTypes.TOKEN_HISTORY ,'reserve0', reserve0);
+            this.bulk.bulk_normal.setTokenBulkSet( pairAdd, EnumBulkTypes.TOKEN_HISTORY ,'reserve1', reserve1);
+            return; // just update the reserves and skip
+        }
+        
+        let sender = swapInfo.sender;
+        let router = swapInfo.router;
+       
+
+        let pairInfos =  { 
+            pair: pairAdd,
+            router: router,
+            tokens: [token0, token1],
+            reserves: [reserve0, reserve1],
+            decimals: [token0Infos.decimals, token1Infos.decimals],
+        };
+        this.cache.setPair(pairAdd, pairInfos); // create or update the pair inside the cache and arbitrage store
+
+        let routerInfos = await this.routers.getRouter( router, token0, token1, token0Infos.decimals );
+   
 
         let [ mainToken, dependantToken ] = await this.tokenHierarchy(token0Infos, token1Infos, tokenHistory); // get who is the main token in the pair
-
-        this.routers.getRouter( router, token0, token1, token0Infos.decimals );
-
-        // console.log(`[TIME] Retrive token hierarchy: ${(Date.now()-START)/1000}`);
-        // START = Date.now();
         
         // cross chain
         let mainTokenIsBNB = this.isMainToken( mainToken.contract );
 
         let dependantTokenPrice = null; // calculate the dependant token price
-        if( mainToken.contract == token0 ) dependantTokenPrice = (first_reserves[0]/10**mainToken.decimals)/(first_reserves[1]/10**dependantToken.decimals); // here decimals
-        else dependantTokenPrice = (first_reserves[1]/10**mainToken.decimals)/(first_reserves[0]/10**dependantToken.decimals); 
+        if( mainToken.contract == token0 ) dependantTokenPrice = reserve0/reserve1; // here decimals
+        else dependantTokenPrice = reserve1/reserve0; 
 
         if( mainTokenIsBNB ){ // if the main token was BNB then multiply for get the token usd value
             if(this.CHAIN_MAIN_TOKEN_PRICE){
@@ -206,51 +204,42 @@ class Scraper {
             }
         } 
 
-        
-    
         if( !tokenHistory ){
             tokenHistory = {
                 records_transactions: 0,
                 records_price: 0,
+                records_date: todayDateUnix(),
                 chain: EnumChainId.BSC, // cross chain
                 token0: {
                     contract: token0Infos.contract,
                     name: token0Infos.name,
-                    symbol: token0Infos.symbol
+                    symbol: token0Infos.symbol,
+                    decimals: token0Infos.decimals,
                 },
                 token1: {
                     contract: token1Infos.contract,
                     name: token1Infos.name,
-                    symbol: token1Infos.symbol
+                    symbol: token1Infos.symbol,
+                    decimals: token1Infos.decimals,
                 },
                 router: router,
-                pair: pair_contract,
+                pair: pairAdd,
                 mainToken: mainToken.contract,
-                dependantToken: dependantToken.contract
+                dependantToken: dependantToken.contract,
+                
             };
-            
             console.log(`[BULK ADD CREATE] ${Object.keys(this.bulk.bulk_normal.getHistories(EnumBulkTypes.TOKEN_HISTORY)).length} ${dependantToken.contract}`);
-            this.bulk.bulk_normal.setNewDocument( pair_contract, EnumBulkTypes.TOKEN_HISTORY, tokenHistory );
-            this.cache.setHistory(pair_contract, tokenHistory);
-        }
-
-        // console.log(`[TIME] Minor calculations: ${(Date.now()-START)/1000}`);
-        // START = Date.now();
+            this.bulk.bulk_normal.setNewDocument( pairAdd, EnumBulkTypes.TOKEN_HISTORY, tokenHistory );
+            this.cache.setHistory(pairAdd, tokenHistory);
+        } 
         
-        
-        console.log(`[INFO] MAIN: ${mainToken.contract} | DEPENDANT: ${dependantToken.contract} | ${pairAddress}`); 
-        console.log(`[INFO] DEPENDANT PRICE: ${dependantTokenPrice}$ | ${pairAddress} `);
-        
-        let reserve0 = first_reserves[0]/10**token0Infos.decimals;
-        let reserve1 = first_reserves[1]/10**token1Infos.decimals;
+        console.log(`[INFO] MAIN: ${mainToken.contract} | DEPENDANT: ${dependantToken.contract} | ${pairAdd}`); 
+        console.log(`[INFO] DEPENDANT PRICE: ${dependantTokenPrice}$ | ${pairAdd} `);
 
-        let pairHistory = await this.historyPrices.getHistory(pair_contract);
 
-        // console.log(`[TIME] Getting history: ${(Date.now()-START)/1000}`);
-        // START = Date.now();
-
+        let pairHistory = await this.historyPrices.getHistory(pairAdd);
         await this.updatePrice( 
-            router, pair_contract, dependantToken.contract, mainToken.contract,
+            router, pairAdd, dependantToken.contract, mainToken.contract,
             pairHistory.latest, dependantTokenPrice, 
             reserve0, reserve1 
         );
@@ -258,11 +247,25 @@ class Scraper {
         // console.log(`[TIME] Updating price: ${(Date.now()-START)/1000}`);
         // START = Date.now();
 
+        // increase the token score
+        let todayUnix = todayDateUnix();
+        this.bulk.bulk_normal.setTokenBulkInc( token0, EnumBulkTypes.TOKEN_BASIC ,`score.${todayUnix}`, 1 );  
+        if(!token0Infos.score) token0Infos.score = {};
+        token0Infos.score[todayUnix] = token0Infos.score[todayUnix] ? token0Infos.score[todayUnix] + 1 : 1;
+        this.cache.setToken(token0, {...token0Infos});
+
+        if(!token1Infos.score) token1Infos.score = {};
+        this.bulk.bulk_normal.setTokenBulkInc( token1, EnumBulkTypes.TOKEN_BASIC ,`score.${todayUnix}`, 1 );
+        token1Infos.score[todayUnix] = token1Infos.score[todayUnix] ? token1Infos.score[todayUnix] + 1 : 1;
+        this.cache.setToken(token1, {...token1Infos});
+
+        console.log(`[SCORE]`, token1Infos.score, token0Infos.score)
+
         // update the pair records
-        this.bulk.bulk_normal.setTokenBulkInc( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,`records_transactions`, 1 );
-        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'reserve0', reserve0);
-        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'reserve1', reserve1);
-        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY ,'price', dependantTokenPrice);
+        this.bulk.bulk_normal.setTokenBulkInc( pairAdd, EnumBulkTypes.TOKEN_HISTORY ,`records_transactions`, 1 );
+        this.bulk.bulk_normal.setTokenBulkSet( pairAdd, EnumBulkTypes.TOKEN_HISTORY ,'reserve0', reserve0);
+        this.bulk.bulk_normal.setTokenBulkSet( pairAdd, EnumBulkTypes.TOKEN_HISTORY ,'reserve1', reserve1);
+        this.bulk.bulk_normal.setTokenBulkSet( pairAdd, EnumBulkTypes.TOKEN_HISTORY ,'price', dependantTokenPrice);
 
         // detect the main reseve and the dependant token reserve in the pair
         let mainReserve;
@@ -277,96 +280,53 @@ class Scraper {
 
         let mainReserveValue = mainReserve; 
         if( mainTokenIsBNB ) mainReserveValue = mainReserve * this.CHAIN_MAIN_TOKEN_PRICE; // if the main token of the pair is BNB then multiply the tokens in the pair reserver * bnb price
-        this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY, 'mainReserveValue', mainReserveValue);
+        this.bulk.bulk_normal.setTokenBulkSet( pairAdd, EnumBulkTypes.TOKEN_HISTORY, 'mainReserveValue', mainReserveValue);
 
         // update daily variation percentage
         let dayAgoHistoryPrice = pairHistory.day;
+        console.log( dayAgoHistoryPrice )
         if( dayAgoHistoryPrice ){ 
             let dailyVariation = relDiff(dependantTokenPrice, dayAgoHistoryPrice.value).toFixed(2);
-            this.bulk.bulk_normal.setTokenBulkSet( pair_contract, EnumBulkTypes.TOKEN_HISTORY, 'variation.day', dailyVariation );
-            console.log(`[UPDATING PERCENTAGE DAILY] ${pair_contract} ${dailyVariation}`)
+            this.bulk.bulk_normal.setTokenBulkSet( pairAdd, EnumBulkTypes.TOKEN_HISTORY, 'variation.day', dailyVariation );
+            console.log(`[UPDATING PERCENTAGE DAILY] ${pairAdd} ${dailyVariation}`)
         }
 
         // console.log(`[TIME] Update other minor infos: ${(Date.now()-START)/1000}`);
         // START = Date.now();
 
-        /**
-         * - TODO
-         * Currently the price in usd relative to the amount of mainTokens transferred during the swap is not directly calculated
-         * except if the main token is BNB.
-         * 
-         * Assuming that most of the swap are made through bnb or stable coins
-         * then the script calculates for the following swap transactions this usd volumes
-         * 
-         * - 2BNB -> 100TOKEN : usd value of 2 * BNB_PRICE_IN_USD [ correct approach ]
-         * 
-         * - 10USDT -> 100TOKEN : usd value of 10 * 1. [ mostly correct approach ]
-         * - it do not really uses the USDT value to calculate the volumne, but just use the amount of USDT transferred 
-         * - to infer the value since USDT is pegged to USD. 
-         * 
-         * this approach can me mostly correct with BNB and stable coins with high market cap
-         * but if we have as mainToken some other random tokens we will have the following behaviour
-         * 
-         * 100 DOGE -> 100 TOKEN: value of 100 * 1 [ wrong approach ]
-         * so the transaction usd volume will result as 100 usd, instead it should be 100 * DOGE_PRICE_IN_USD
-         * 
-         * The main problem is that retriveing the price of each mainToken that is not bnb or a stable coin is highly expensive becouse
-         * we have to make many read operations to the database, and if we manage 500-1500 transaction per seconds or more it will result in
-         * a big LAG of all the apllications running on our system.
-         * 
-         * Something like the currently used cache system should be implemented, but the price of this tokens can vary from moment to moment,
-         * so each time that the price of this tokens changes we should update the cache as well.
-         * 
-        */
+        let amountInNoDecimals = swapInfo.transfer.sold.token == token0 ? swapInfo.transfer.sold.amount/(10**token0Infos.decimals)
+            : swapInfo.transfer.sold.amount/(10**token1Infos.decimals);
 
-        /*****
-        // update transactions object
-        let type; // track if transaction is buy or sell
-        let transferredTokensValue; // track the amount of mainToken used in ths transactions
-        let transferredTokensAmount;
-        let mainTokenPrice = 1; // if set to 1 it will have no impact on the multiplications below, it will be always be 1 except when the main token is BNB
-        if( mainTokenIsBNB ) mainTokenPrice = this.CHAIN_MAIN_TOKEN_PRICE[0];
-
-        let amountOut; 
-        let amountOutWithDecimals;
-        if( mainToken.contract == tokenOriginalOrder[0] ){
-            amountOut = ( dependantReserve/mainReserve ) * (amountIn/10**mainToken.decimals) ;
-            amountOutWithDecimals = amountOut * ( 10 ** dependantToken.decimals );
-            transferredTokensValue = (amountIn/10**mainToken.decimals) * mainTokenPrice;
-            transferredTokensAmount = amountOut;
-            type = 0;
-        } else {
-            amountOut = ( mainReserve/dependantReserve ) * (amountIn/10**dependantToken.decimals);
-            amountOutWithDecimals = amountOut * ( 10 ** mainToken.decimals );
-            transferredTokensValue = amountOut * mainTokenPrice;
-            transferredTokensAmount = (amountIn/10**dependantToken.decimals);
-            type = 1;
-        }
+        let amountOutNoDecimals = swapInfo.transfer.bought.token == token0 ? swapInfo.transfer.bought.amount/(10**token0Infos.decimals)
+            : swapInfo.transfer.bought.amount/(10**token1Infos.decimals);
 
         let time = Date.now()/1000;
-        console.log('[SETTING TRANSACTION] ', pair_contract, time)
-        this.bulk.bulk_time.setNewDocument( pair_contract, EnumBulkTypes.HISOTRY_TRANSACTION, time, {
+        console.log('[SETTING TRANSACTION] ', pairAdd, time);
+        this.bulk.bulk_time.setNewDocument( pairAdd, EnumBulkTypes.HISOTRY_TRANSACTION, time, {
             time: time, // unix timestamp
-            type: type, // [ buy -> type = 1 ]. [ sell -> type = 0 ]
-            hash: txHash,
-            from: txSender,
-            value: transferredTokensValue,
-            amount: transferredTokensAmount,
-            pair: pair_contract,
+            hash: hash,
+            from: sender,
+            
+            amountIn: amountInNoDecimals,
+            amountOut: amountOutNoDecimals,
+
+            tokenIn: swapInfo.transfer.sold.token ,
+            tokenOut: swapInfo.transfer.bought.token,
+
+            pair: pairAdd,
             router: router,
+
             dependantToken: dependantToken.contract,
             mainToken: mainToken.contract
         }, false, 0.0001, true);
 
-        return amountOutWithDecimals;
-        *******/
     }
 
     getTime() { return Math.floor((Date.now()/1000)/this.UPDATE_PRICE_INTERVAL) * this.UPDATE_PRICE_INTERVAL }
     async updatePrice( router, pair, tokenAddress, mainTokenAddress, latestHistoryPirce, newPrice, reserve0, reserve1 ) {
     
         let time = this.getTime();
-        let tokenInfo = this.cache.getToken(tokenAddress);
+        let tokenInfo = this.cache.getToken(UtilsAddresses.toCheckSum(tokenAddress));
         if( !newPrice ) return;
         
 
@@ -393,7 +353,6 @@ class Scraper {
             
             
         } else { // create new record  
-
             
             if( !latestHistoryTime || typeof latestHistoryTime != 'number' ){  // load the time of the last time that this price was updated so that we can change the 'close' parameter
                 console.log(`[CLOSE RETRIVE] RETRIVING LAST HISTORY ${pair}. ${latestHistoryTime}`);

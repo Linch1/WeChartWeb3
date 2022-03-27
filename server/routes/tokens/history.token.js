@@ -8,21 +8,21 @@ router.get('/:token',
         let token = req.params.token;
         let from = req.query.from; 
         let to = req.query.to;
+
+        let resolution = req.query.resolution;
         let records = req.query.countBack;
         let pair = await Services.token.getMainPair(token);
 
         if( !from || !to || !records || !pair ) return res.status(400).send({ error: { msg: "Invalid params", data: [] }});
 
-        let start = Date.now();
-        let priceRecords = await Services.price.findPrices( pair.mainPair, from, to, records  );
+        let priceRecords = await Services.price.findPrices( pair.mainPair, from, to, records, resolution );
+       
         if( !priceRecords || !priceRecords.length ) {
             let last_history = await Services.price.findLastPrice( pair.mainPair, from, to );
-            if(!last_history) return res.status(200).send({ success: { msg: "success", data: [] }});
+            if(!last_history) return res.status(200).send({ success: { msg: "success", reason: "No older records", data: [] }});
             return res.status(200).send({ success: { msg: "success", data: [], nextTime: last_history.time }});
         }
         
-        
-
         return res.status(200).send({ success: { msg: "success", data: priceRecords }});
     }
 )
