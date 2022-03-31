@@ -19,6 +19,10 @@
 - Run the scraper `npm run scraper` and left it run
 - Run the server on another terminal `npm run server`
 
+### Frontend Demo
+
+- Visit https://github.com/Linch1/Web3TokenChartingDemo to check a frontend implementation of this repo
+
 ### Query the prices
 
 - Inside the repo you can find a rest api built with `expressjs` that you can use to query the scraped prices  
