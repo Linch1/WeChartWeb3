@@ -1,3 +1,6 @@
+### Frontend Implementation
+- Visit https://github.com/Linch1/Web3TokenChartingDemo to check a frontend implementation of this repo
+
 ### Intro
 
 **How does this work?** The `price scraper` listens for the latest swap made to blockchain, based on the token's liquidity pair reserves you can calculate the tokens prices, the router of the swap and the pair of the tokens.
@@ -18,10 +21,6 @@
 - Install the repo dependencies `npm i`
 - Run the scraper `npm run scraper` and left it run
 - Run the server on another terminal `npm run server`
-
-### Frontend Demo
-
-- Visit https://github.com/Linch1/Web3TokenChartingDemo to check a frontend implementation of this repo
 
 ### Query the prices
 
