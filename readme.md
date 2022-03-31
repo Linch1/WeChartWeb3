@@ -13,13 +13,11 @@
 - Install npm `sudo apt install npm`
 - Download the repo
 - Navigate to the repo from the termian `cd /path/to/tokenChartingRepo`
+- clone the `.env.exapmple` file to `.env`
+- populate the file `.env` ( especially with a bsc/eth/polygon/.. provider that support a relevant amount of requests )
 - Install the repo dependencies `npm i`
-- Run the scraper `npm run scraper`
-
-
-### Start the price scraper
-
-- Start the price scraper with `npm run price-scraper`, now the db will start being populated from all the swapped tokens allover the blockchain.
+- Run the scraper `npm run scraper` and left it run
+- Run the server on another terminal `npm run server`
 
 ### Query the prices
 
