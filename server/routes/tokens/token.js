@@ -2,7 +2,6 @@ require("dotenv").config();
 var express = require('express');
 const EnumChainId = require("../../../enum/chain.id");
 const EnumMainTokens = require("../../../enum/mainTokens");
-const ApiVoting = require("../../api/voting");
 var router = express.Router();
 let Services = require('../../service');
 
@@ -54,12 +53,6 @@ router.get('/info/:contract',
         let allPairs = await Services.token.getPairs( contract );
         tokenInfo.pairs = allPairs;
         
-        let fromVoting = await ApiVoting.getTokenInfos( contract );
-        if( fromVoting.success ) {
-            let data = fromVoting.success.data;
-            delete data._id;
-            tokenInfo = {...tokenInfo, ...data }
-        }
         // end custom
         return res.status(200).send({ success: { msg: "success", data: tokenInfo }});
     }

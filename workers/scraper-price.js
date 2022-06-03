@@ -211,6 +211,7 @@ async function scanTransactionCallback(hash, pair, pairDatas) {
         topics: filter
     }, 
         async (error, tx) => {
+            console.log(tx)
             console.log('Detected new log', tx.transactionHash);
             queue.add(error, tx) 
         }
