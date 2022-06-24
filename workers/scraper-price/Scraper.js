@@ -14,6 +14,9 @@ const abiDecoder = require('abi-decoder');
 const Router = require("./entity/Routers");
 const BigNumber = require("bignumber.js");
 const UtilsAddresses = require("../../utils/addresses");
+
+const scraperConfig = require("../../config.js");
+
 abiDecoder.addABI(EnumAbi[EnumChainId.BSC].TOKEN);
 abiDecoder.addABI(EnumAbi[EnumChainId.BSC].ROUTERS.PANCAKE);
 
@@ -138,6 +141,11 @@ class Scraper {
         return [token0, token1];
     }
 
+    isWhitelisted( token ){
+        if( !scraperConfig.whitelist_enabled ) return true;
+        return scraperConfig.whitelist.includes(token);
+    }
+
     /**
      * @description Add the token price inside the Bulk history
      * @param {*} token0 address
@@ -157,6 +165,8 @@ class Scraper {
         if( swapInfo && (!swapInfo.transfer.bought || !swapInfo.transfer.sold) ) return; // if this is a swap, and some infos miss, skip it;
 
         let [token0, token1] = await this.getTokens(pairAdd, cachedPair);
+
+        if( !this.isWhitelisted(token0) && !this.isWhitelisted(token1) ) return;
         
         if(!token0 || !token1 ) return;
         let tokenHistory = await this.tokenHistories.getTokenHistory( pairAdd );
