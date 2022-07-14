@@ -1,0 +1,5 @@
+node_modules
+.env
+scraper.log
+missing.json
+config.js
