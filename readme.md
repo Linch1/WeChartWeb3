@@ -26,10 +26,9 @@ The `price scraper` listens for the latest swap made to blockchain, based on the
 
 	- If you want it to **restart on crash** follow this commands:
 		- Install pm2 `sudo npm install pm2 -g`
-		- Make pm2 restart the scraper if the server crash `sudo pm2 startup`
+		- Make pm2 restart the scraper if the server crash `pm2 startup`
 		- Run the scraper `pm2 start npm --name "charting-bot-restarter" -- run restarter`
 		- Save the pm2 running processes `pm2 save`
-		- Make pm2 run on reboot `pm2 startup`
 		- For see the current active pm2 processes `pm2 status`
 		- For see the scraper logs `spm2 logs charting-bot`
 
