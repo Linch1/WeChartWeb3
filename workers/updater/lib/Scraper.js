@@ -242,8 +242,8 @@ class Scraper {
             reserves: [reserve0, reserve1],
             decimals: [token0Infos.decimals, token1Infos.decimals],
             fees: {
-                token0: tokenHistory ? tokenHistory.fees.token0 : null,
-                token1: tokenHistory ? tokenHistory.fees.token1 : null,
+                token0: tokenHistory ? tokenHistory.fees?.token0 : null,
+                token1: tokenHistory ? tokenHistory.fees?.token1 : null,
             }
         };
 
