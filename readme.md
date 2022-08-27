@@ -30,7 +30,7 @@ The `price scraper` listens for the latest swap made to blockchain, based on the
 		- Run the scraper `pm2 start npm --name "charting-bot-restarter" -- run restarter`
 		- Save the pm2 running processes `pm2 save`
 		- For see the current active pm2 processes `pm2 status`
-		- For see the scraper logs `spm2 logs charting-bot`
+		- For see the scraper logs `pm2 logs charting-bot`
 
 	- If you **don't** want it to **restart on crash**
 		- `npm run scraper`
