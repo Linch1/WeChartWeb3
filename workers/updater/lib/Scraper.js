@@ -352,14 +352,14 @@ class Scraper {
                 amount: parseInt(swapInfo.params.amount0In) ? 
                 swapInfo.params.amount0In/(10**token0Infos.decimals) 
                 : swapInfo.params.amount1In/(10**token1Infos.decimals),
-                token: swapInfo.params.amount0In ? token0: token1
+                token: parseInt(swapInfo.params.amount0In) ? token0: token1
             }
     
             let swapInfoOut = {
                 amount: parseInt(swapInfo.params.amount0Out) ? 
                 swapInfo.params.amount0Out/(10**token0Infos.decimals) 
                 : swapInfo.params.amount1Out/(10**token1Infos.decimals),
-                token: swapInfo.params.amount0Out ? token0: token1
+                token: parseInt(swapInfo.params.amount0Out) ? token0: token1
             }
     
             let time_unix = time/1000;
