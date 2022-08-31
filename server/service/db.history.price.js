@@ -13,7 +13,7 @@ async function findPrices( pair, from, to, recordsCount, resolution ){
           pair: UtilsAddresses.toCheckSum(pair), 
           time: { $lt: parseInt(to) } 
         }
-      ).sort({time: -1}).lean().limit(recordsCount).select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).exec();
+      ).sort({time: -1}).limit(parseInt(recordsCount)).lean().select({ value: 1, low: 1, high: 1, open: 1, close: 1, time: 1 }).exec();
     }
     else {
       let multiplier = 1;
