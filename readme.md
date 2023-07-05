@@ -22,6 +22,7 @@ The `price scraper` listens for the latest swap made to blockchain, based on the
 - Download the repo
 - Navigate to the repo from the termian `cd /path/to/tokenChartingRepo`
 - Install the repo dependencies `npm i`
+- Create a `.env` and a `config.js` file based on the provided examples
 - Start the scraper
 
 	- If you want it to **restart on crash** follow this commands:
