@@ -20,7 +20,7 @@ The `price scraper` listens for the latest swap made to blockchain, based on the
 - Install nodejs `sudo apt install nodejs`
 - Install npm `sudo apt install npm`
 - Download the repo
-- Navigate to the repo from the termian `cd /path/to/tokenChartingRepo`
+- Navigate to the repo from the terminal `cd /path/to/tokenChartingRepo`
 - Install the repo dependencies `npm i`
 - Create a `.env` and a `config.js` file based on the provided examples
 - Start the scraper
